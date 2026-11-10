@@ -1,0 +1,663 @@
+// ClosetIQ Production Database Schema
+// Fully Normalized Architecture with 21 Domain Entities
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------
+// ENUMS
+// ----------------------------------------------------
+
+enum UserRole {
+  USER
+  STYLIST
+  ADMIN
+}
+
+enum ImageType {
+  FULL_BODY
+  PORTRAIT
+  WARDROBE_ITEM
+  INSPIRATION
+}
+
+enum BodyShape {
+  HOURGLASS
+  RECTANGLE
+  PEAR
+  INVERTED_TRIANGLE
+  APPLE
+  UNSPECIFIED
+}
+
+enum Undertone {
+  COOL
+  WARM
+  NEUTRAL
+  OLIVE
+  UNSPECIFIED
+}
+
+enum SeasonalPalette {
+  TRUE_SPRING
+  LIGHT_SPRING
+  BRIGHT_SPRING
+  TRUE_SUMMER
+  LIGHT_SUMMER
+  SOFT_SUMMER
+  TRUE_AUTUMN
+  SOFT_AUTUMN
+  DEEP_AUTUMN
+  TRUE_WINTER
+  BRIGHT_WINTER
+  DEEP_WINTER
+  UNSPECIFIED
+}
+
+enum ClothingSlot {
+  TOP
+  BOTTOM
+  ONE_PIECE
+  OUTERWEAR
+  FOOTWEAR
+  ACCESSORY
+  BAG
+}
+
+enum FormalityLevel {
+  CASUAL
+  SMART_CASUAL
+  BUSINESS_CASUAL
+  BUSINESS_FORMAL
+  BLACK_TIE
+}
+
+enum AnalysisStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  FLAGGED_FOR_REVIEW
+}
+
+enum RecommendationType {
+  DAILY_CURATION
+  COMPLETE_MY_OUTFIT
+  BUDGET_LOOK
+  OCCASION_SPECIFIC
+}
+
+enum InteractionType {
+  VIEW_PRODUCT
+  CLICK_MERCHANT_LINK
+  LOG_WEAR_ITEM
+  FAVORITE_ITEM
+  DISMISS_RECOMMENDATION
+}
+
+enum AiTaskType {
+  BODY_SHAPE_ESTIMATION
+  COLOR_UNDERTONE_ESTIMATION
+  GARMENT_ATTRIBUTE_EXTRACTION
+  EDITORIAL_STYLING_ADVICE
+}
+
+// ----------------------------------------------------
+// 1. USERS & IDENTITY
+// ----------------------------------------------------
+
+model User {
+  id                     String                  @id @default(uuid())
+  email                  String                  @unique
+  passwordHash           String
+  role                   UserRole                @default(USER)
+  isVerified             Boolean                 @default(false)
+  deletedAt              DateTime?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  profile                UserProfile?
+  preferences            UserPreference?
+  measurementProfile     MeasurementProfile?
+  styleProfile           StyleProfile?
+  images                 UserImage[]
+  bodyAnalyses           BodyAnalysis[]
+  colorAnalyses          ColorAnalysis[]
+  wardrobeItems          WardrobeItem[]
+  savedOutfits           SavedOutfit[]
+  wishlists              Wishlist[]
+  recommendations        Recommendation[]
+  recommendationFeedback RecommendationFeedback[]
+  userInteractions       UserInteraction[]
+  aiAnalysisRuns         AiAnalysisRun[]
+
+  @@index([email])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+// ----------------------------------------------------
+// 2. USER PROFILES
+// ----------------------------------------------------
+
+model UserProfile {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName   String?
+  lastName    String?
+  displayName String?
+  avatarUrl   String?
+  bio         String?   @db.Text
+  birthDate   DateTime?
+  gender      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("user_profiles")
+}
+
+// ----------------------------------------------------
+// 3. USER PREFERENCES
+// ----------------------------------------------------
+
+model UserPreference {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  budgetTier            Int      @default(2) // 1: Budget, 2: Mid-tier, 3: Luxury
+  preferredCurrency     String   @default("USD")
+  preferredBrands       String[]
+  avoidedColors         String[]
+  preferredFits         String[]
+  notificationsEnabled  Boolean  @default(true)
+  privacyHighSensitivity Boolean @default(true) // Auto-purge photos after geometric landmark extraction
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("user_preferences")
+}
+
+// ----------------------------------------------------
+// 4. MEASUREMENT PROFILES
+// ----------------------------------------------------
+
+model MeasurementProfile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  heightCm           Decimal? @db.Decimal(5, 2)
+  weightKg           Decimal? @db.Decimal(5, 2)
+  shoulderWidthCm    Decimal? @db.Decimal(5, 2)
+  chestBustCm        Decimal? @db.Decimal(5, 2)
+  waistCm            Decimal? @db.Decimal(5, 2)
+  hipCm              Decimal? @db.Decimal(5, 2)
+  inseamCm           Decimal? @db.Decimal(5, 2)
+  topSizeStandard    String?  // e.g., "S", "M", "L"
+  bottomSizeStandard String?  // e.g., "30", "32", "EU 40"
+  shoeSizeStandard   String?  // e.g., "US 10", "EU 43"
+  unitSystem         String   @default("METRIC")
+  isVerifiedByUser   Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("measurement_profiles")
+}
+
+// ----------------------------------------------------
+// 5. USER IMAGES (Secure Direct-to-Cloud Upload Tracking)
+// ----------------------------------------------------
+
+model UserImage {
+  id               String          @id @default(uuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  imageType        ImageType
+  storageKey       String          @unique
+  storageProvider  String          @default("S3") // "S3", "CLOUDINARY"
+  originalFilename String?
+  mimeType         String
+  fileSizeBytes    Int
+  isArchived       Boolean         @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  bodyAnalyses     BodyAnalysis[]
+  colorAnalyses    ColorAnalysis[]
+  wardrobeItems    WardrobeItem[]
+
+  @@index([userId, imageType])
+  @@index([deletedAt])
+  @@map("user_images")
+}
+
+// ----------------------------------------------------
+// 6. BODY ANALYSES (Geometric Keypoint Estimates)
+// ----------------------------------------------------
+
+model BodyAnalysis {
+  id                   String         @id @default(uuid())
+  userId               String
+  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userImageId          String?
+  userImage            UserImage?     @relation(fields: [userImageId], references: [id], onDelete: SetNull)
+  estimatedShape       BodyShape      @default(UNSPECIFIED)
+  confirmedShape       BodyShape      @default(UNSPECIFIED)
+  shoulderToHipRatio   Decimal?       @db.Decimal(4, 3)
+  waistToHipRatio      Decimal?       @db.Decimal(4, 3)
+  waistToShoulderRatio Decimal?       @db.Decimal(4, 3)
+  confidenceScore      Decimal        @default(0.0) @db.Decimal(4, 3)
+  landmarkData         Json?          // Normalized 2D/3D landmarks (scrubbed of biometric identifiers)
+  status               AnalysisStatus @default(PENDING)
+  notes                String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([userId, createdAt])
+  @@map("body_analyses")
+}
+
+// ----------------------------------------------------
+// 7. COLOR ANALYSES (CIELAB Skin Colorimetry & Palettes)
+// ----------------------------------------------------
+
+model ColorAnalysis {
+  id                       String          @id @default(uuid())
+  userId                   String
+  user                     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userImageId              String?
+  userImage                UserImage?      @relation(fields: [userImageId], references: [id], onDelete: SetNull)
+  estimatedUndertone       Undertone       @default(UNSPECIFIED)
+  confirmedUndertone       Undertone       @default(UNSPECIFIED)
+  seasonalPalette          SeasonalPalette @default(UNSPECIFIED)
+  confirmedPalette         SeasonalPalette @default(UNSPECIFIED)
+  cielabL                  Decimal?        @db.Decimal(5, 2)
+  cielabA                  Decimal?        @db.Decimal(5, 2)
+  cielabB                  Decimal?        @db.Decimal(5, 2)
+  individualTypologyAngle  Decimal?        @db.Decimal(5, 2)
+  contrastLevel            String?         // "LOW", "MEDIUM", "HIGH"
+  recommendedPaletteColors Json?           // Array of recommended hex colors
+  confidenceScore          Decimal         @default(0.0) @db.Decimal(4, 3)
+  status                   AnalysisStatus  @default(PENDING)
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+
+  @@index([userId, createdAt])
+  @@map("color_analyses")
+}
+
+// ----------------------------------------------------
+// 8. STYLE PROFILES
+// ----------------------------------------------------
+
+model StyleProfile {
+  id                      String   @id @default(uuid())
+  userId                  String   @unique
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  primaryStyleArchetype   String?  // e.g. "Minimalist", "Quiet Luxury", "Classic", "Avant-Garde"
+  secondaryStyleArchetype String?
+  styleKeywords           String[] // ["tailored", "monochrome", "linen", "structured"]
+  formalityComfortZone    Int      @default(3) // 1 (Casual) to 5 (Formal)
+  lifestyleTags           String[] // ["office", "travel", "remote_work", "weekend"]
+  isComplete              Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("style_profiles")
+}
+
+// ----------------------------------------------------
+// 9. BRANDS
+// ----------------------------------------------------
+
+model Brand {
+  id              String    @id @default(uuid())
+  name            String    @unique
+  slug            String    @unique
+  logoUrl         String?
+  websiteUrl      String?
+  priceTier       Int       @default(2) // 1: Contemporary, 2: Premium, 3: Luxury
+  countryOfOrigin String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  products        Product[]
+
+  @@index([name])
+  @@map("brands")
+}
+
+// ----------------------------------------------------
+// 10. CATEGORIES (Hierarchical with Slots)
+// ----------------------------------------------------
+
+model Category {
+  id            String         @id @default(uuid())
+  name          String
+  slug          String         @unique
+  parentId      String?
+  parent        Category?      @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children      Category[]     @relation("CategoryHierarchy")
+  slotType      ClothingSlot
+  displayOrder  Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  products      Product[]
+  wardrobeItems WardrobeItem[]
+
+  @@index([slotType])
+  @@index([parentId])
+  @@map("categories")
+}
+
+// ----------------------------------------------------
+// 11. PRODUCTS (Core Canonical Catalog - Zero Duplication)
+// ----------------------------------------------------
+
+model Product {
+  id                  String             @id @default(uuid())
+  brandId             String
+  brand               Brand              @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  categoryId          String
+  category            Category           @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  title               String
+  slug                String             @unique
+  sku                 String?
+  description         String?            @db.Text
+  basePrice           Decimal            @db.Decimal(10, 2)
+  currency            String             @default("USD")
+  retailPrice         Decimal?           @db.Decimal(10, 2)
+  isAvailable         Boolean            @default(true)
+  mainImageUrl        String?
+  additionalImageUrls String[]
+  deletedAt           DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  attributes          ProductAttribute?
+  merchantSources     MerchantSource[]
+  outfitItems         OutfitItem[]
+  wishlists           Wishlist[]
+  userInteractions    UserInteraction[]
+
+  @@index([brandId])
+  @@index([categoryId])
+  @@index([basePrice])
+  @@index([deletedAt])
+  @@map("products")
+}
+
+// ----------------------------------------------------
+// 12. PRODUCT ATTRIBUTES (Physical & Styling Parameters)
+// ----------------------------------------------------
+
+model ProductAttribute {
+  id                  String         @id @default(uuid())
+  productId           String         @unique
+  product             Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  primaryColorName    String
+  primaryColorHex     String
+  secondaryColorHex   String?
+  colorFamily         String?        // "NEUTRAL", "WARM", "COOL", "EARTH", "PASTEL"
+  pattern             String         @default("SOLID") // "SOLID", "STRIPED", "CHECK", "FLORAL"
+  material            String?        // "Wool", "Silk", "Linen", "Cotton", "Cashmere"
+  formalityLevel      FormalityLevel @default(SMART_CASUAL)
+  seasonalSuitability String[]       // ["SPRING", "AUTUMN", "WINTER"]
+  fitType             String?        // "SLIM", "REGULAR", "RELAXED", "OVERSIZED"
+  careInstructions    String?
+  extraAttributes     Json?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@index([primaryColorName])
+  @@index([formalityLevel])
+  @@map("product_attributes")
+}
+
+// ----------------------------------------------------
+// 13. MERCHANT SOURCES (Stores, Stock, Outbound Links)
+// ----------------------------------------------------
+
+model MerchantSource {
+  id               String    @id @default(uuid())
+  productId        String
+  product          Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  merchantName     String    // e.g. "SSENSE", "Mr Porter", "Net-A-Porter", "Zara"
+  merchantSlug     String
+  externalSku      String
+  productUrl       String
+  affiliateUrl     String?
+  inStock          Boolean   @default(true)
+  availableSizes   String[]
+  currentPrice     Decimal   @db.Decimal(10, 2)
+  currency         String    @default("USD")
+  affiliateNetwork String?   // "Impact", "Rakuten", "Direct"
+  commissionRate   Decimal?  @db.Decimal(5, 2)
+  lastCheckedAt    DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([merchantSlug, externalSku])
+  @@index([productId])
+  @@index([inStock, currentPrice])
+  @@map("merchant_sources")
+}
+
+// ----------------------------------------------------
+// 14. WARDROBE ITEMS (User Digitized Closet)
+// ----------------------------------------------------
+
+model WardrobeItem {
+  id                   String            @id @default(uuid())
+  userId               String
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId           String
+  category             Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  userImageId          String?
+  userImage            UserImage?        @relation(fields: [userImageId], references: [id], onDelete: SetNull)
+  name                 String
+  brandName            String?
+  primaryColorName     String
+  primaryColorHex      String
+  secondaryColorHex    String?
+  pattern              String            @default("SOLID")
+  material             String?
+  formalityLevel       FormalityLevel    @default(CASUAL)
+  seasonalSuitability  String[]
+  fitType              String?
+  purchasePrice        Decimal?          @db.Decimal(10, 2)
+  timesWorn            Int               @default(0)
+  lastWornAt           DateTime?
+  isFavorite           Boolean           @default(false)
+  isArchived           Boolean           @default(false)
+  aiDetectedAttributes Json?             // Raw AI vision detection details
+  deletedAt            DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  outfitItems          OutfitItem[]
+  userInteractions     UserInteraction[]
+
+  @@index([userId, categoryId])
+  @@index([userId, isArchived])
+  @@index([deletedAt])
+  @@map("wardrobe_items")
+}
+
+// ----------------------------------------------------
+// 15. WISHLISTS
+// ----------------------------------------------------
+
+model Wishlist {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  collectionName String   @default("Default")
+  priority       Int      @default(1) // 1: High, 2: Med, 3: Low
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("wishlists")
+}
+
+// ----------------------------------------------------
+// 16. SAVED OUTFITS
+// ----------------------------------------------------
+
+model SavedOutfit {
+  id               String          @id @default(uuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recommendationId String?         @unique
+  recommendation   Recommendation? @relation(fields: [recommendationId], references: [id], onDelete: SetNull)
+  title            String
+  description      String?
+  occasion         String?
+  season           String?
+  isFavorite       Boolean         @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  items            OutfitItem[]
+
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("saved_outfits")
+}
+
+// ----------------------------------------------------
+// 17. OUTFIT ITEMS (Normalized Outfit Composition)
+// ----------------------------------------------------
+
+model OutfitItem {
+  id               String          @id @default(uuid())
+  savedOutfitId    String?
+  savedOutfit      SavedOutfit?    @relation(fields: [savedOutfitId], references: [id], onDelete: Cascade)
+  recommendationId String?
+  recommendation   Recommendation? @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  wardrobeItemId   String?
+  wardrobeItem     WardrobeItem?   @relation(fields: [wardrobeItemId], references: [id], onDelete: SetNull)
+  productId        String?
+  product          Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  slotType         ClothingSlot
+  layerOrder       Int             @default(1) // 1: Base, 2: Mid, 3: Outer
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([savedOutfitId])
+  @@index([recommendationId])
+  @@index([wardrobeItemId])
+  @@index([productId])
+  @@map("outfit_items")
+}
+
+// ----------------------------------------------------
+// 18. RECOMMENDATIONS (Deterministic Scoring Output)
+// ----------------------------------------------------
+
+model Recommendation {
+  id                 String                  @id @default(uuid())
+  userId             String
+  user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recommendationType RecommendationType
+  queryContext       Json                    // Occasion, weather, formality, target budget
+  overallScore       Decimal                 @db.Decimal(5, 2)
+  colorHarmonyScore  Decimal                 @db.Decimal(5, 2)
+  silhouetteScore    Decimal                 @db.Decimal(5, 2)
+  formalityScore     Decimal                 @db.Decimal(5, 2)
+  budgetScore        Decimal                 @db.Decimal(5, 2)
+  scoringBreakdown   Json                    // Transparent rule matrix breakdown
+  editorialHeadline  String?
+  stylingAdvice      String?                 @db.Text
+  isApplied          Boolean                 @default(false)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  items              OutfitItem[]
+  feedback           RecommendationFeedback?
+  savedOutfit        SavedOutfit?
+
+  @@index([userId, overallScore])
+  @@map("recommendations")
+}
+
+// ----------------------------------------------------
+// 19. RECOMMENDATION FEEDBACK (RL/Scoring Weight Tuning)
+// ----------------------------------------------------
+
+model RecommendationFeedback {
+  id               String         @id @default(uuid())
+  recommendationId String         @unique
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating           Int            // 1 to 5 stars
+  feedbackTags     String[]       // ["too_formal", "clashing_colors", "over_budget"]
+  comment          String?        @db.Text
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([userId])
+  @@map("recommendation_feedback")
+}
+
+// ----------------------------------------------------
+// 20. USER INTERACTIONS (Analytics & Outbound Click Tracking)
+// ----------------------------------------------------
+
+model UserInteraction {
+  id              String          @id @default(uuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interactionType InteractionType
+  productId       String?
+  product         Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  wardrobeItemId  String?
+  wardrobeItem    WardrobeItem?   @relation(fields: [wardrobeItemId], references: [id], onDelete: SetNull)
+  metadata        Json?           // e.g. { referrer, outboundAffiliateTag, ip, device }
+  createdAt       DateTime        @default(now())
+
+  @@index([userId, interactionType])
+  @@index([productId])
+  @@index([createdAt])
+  @@map("user_interactions")
+}
+
+// ----------------------------------------------------
+// 21. AI ANALYSIS RUNS (Audit Log for Computer Vision & LLM)
+// ----------------------------------------------------
+
+model AiAnalysisRun {
+  id                  String         @id @default(uuid())
+  userId              String
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskType            AiTaskType
+  provider            String         // "FASTAPI_CV_SERVICE", "ANTHROPIC_CLAUDE", "OPENAI_GPT"
+  modelVersion        String
+  inputPayload        Json?          // Sanitized metadata passed to model
+  outputPayload       Json?          // Parsed structured result
+  tokenUsageInput     Int?
+  tokenUsageOutput    Int?
+  executionDurationMs Int?
+  status              AnalysisStatus @default(COMPLETED)
+  errorMessage        String?
+  createdAt           DateTime       @default(now())
+
+  @@index([userId, taskType])
+  @@index([provider])
+  @@map("ai_analysis_runs")
+}

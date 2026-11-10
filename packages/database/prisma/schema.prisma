@@ -1,0 +1,374 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  STYLIST
+  ADMIN
+}
+
+enum GenderPreference {
+  WOMENSWEAR
+  MENSWEAR
+  ANDROGYNOUS
+}
+
+enum BodyShape {
+  HOURGLASS
+  RECTANGLE
+  PEAR
+  INVERTED_TRIANGLE
+  APPLE
+  UNSPECIFIED
+}
+
+enum Undertone {
+  COOL
+  WARM
+  NEUTRAL
+  OLIVE
+  UNSPECIFIED
+}
+
+enum SeasonalPalette {
+  TRUE_SPRING
+  LIGHT_SPRING
+  BRIGHT_SPRING
+  TRUE_SUMMER
+  LIGHT_SUMMER
+  SOFT_SUMMER
+  TRUE_AUTUMN
+  SOFT_AUTUMN
+  DEEP_AUTUMN
+  TRUE_WINTER
+  BRIGHT_WINTER
+  DEEP_WINTER
+  UNSPECIFIED
+}
+
+enum ClothingCategory {
+  TOP
+  BOTTOM
+  DRESS
+  OUTERWEAR
+  FOOTWEAR
+  ACCESSORY
+  BAG
+}
+
+enum Formality {
+  CASUAL          // 1-2
+  SMART_CASUAL    // 3-4
+  BUSINESS_CASUAL // 5-6
+  BUSINESS_FORMAL // 7-8
+  BLACK_TIE       // 9-10
+}
+
+enum AnalysisStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  passwordHash       String
+  role               Role                @default(USER)
+  isVerified         Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  deletedAt          DateTime?           // Soft delete for GDPR compliance
+
+  profile            Profile?
+  bodyAnalyses       BodyAnalysis[]
+  wardrobeItems      WardrobeItem[]
+  outfits            Outfit[]
+  savedOutfits       SavedOutfit[]
+  wishlistItems      WishlistItem[]
+  recommendationLogs RecommendationLog[]
+  refreshTokens      RefreshToken[]
+  auditLogs          AuditLog[]
+
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+
+  @@index([userId])
+}
+
+model Profile {
+  id                   String           @id @default(uuid())
+  userId               String           @unique
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName             String?
+  genderPreference     GenderPreference @default(ANDROGYNOUS)
+  heightCm             Float?
+  bustChestCm          Float?
+  waistCm              Float?
+  hipCm                Float?
+  budgetTier           Int              @default(2) // 1: Budget, 2: Mid-tier, 3: Luxury
+  
+  // Deterministic Analysis Confirmations (User may override ML estimates)
+  bodyShapeEstimated   BodyShape        @default(UNSPECIFIED)
+  bodyShapeConfirmed   BodyShape        @default(UNSPECIFIED)
+  undertoneEstimated   Undertone        @default(UNSPECIFIED)
+  undertoneConfirmed   Undertone        @default(UNSPECIFIED)
+  seasonalPalette      SeasonalPalette  @default(UNSPECIFIED)
+  
+  // Flexible Preferences
+  styleKeywords        String[]         // e.g. ["minimalist", "old-money", "grunge"]
+  avoidColors          String[]         // Hex or standard color names
+  preferredBrands      String[]
+  preferredCategories  String[]         @default([])
+  preferredOccasions   String[]         @default([])
+  sizeTop              String?          // e.g. "M", "EU 38"
+  sizeBottom           String?          // e.g. "32", "EU 40"
+  sizeShoes            String?          // e.g. "US 10", "EU 43"
+
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+}
+
+model BodyAnalysis {
+  id                 String         @id @default(uuid())
+  userId             String
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  fullBodyPhotoKey   String?        // Secure storage key (never public)
+  portraitPhotoKey   String?        // Secure storage key (never public)
+  
+  // Extracted Geometric Measurements (Normalized Ratios)
+  shoulderHipRatio   Float?
+  waistHipRatio      Float?
+  torsoLegRatio      Float?
+  
+  // Extracted Skin Colorimetry (CIELAB values)
+  skinLabL           Float?
+  skinLabA           Float?
+  skinLabB           Float?
+  
+  detectedBodyShape  BodyShape      @default(UNSPECIFIED)
+  detectedUndertone  Undertone      @default(UNSPECIFIED)
+  detectedPalette    SeasonalPalette @default(UNSPECIFIED)
+  confidenceScore    Float          @default(0.0)
+  
+  status             AnalysisStatus @default(PENDING)
+  errorMessage       String?
+  
+  createdAt          DateTime       @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model WardrobeItem {
+  id                   String           @id @default(uuid())
+  userId               String
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name                 String
+  imageKey             String           // Storage object key
+  category             ClothingCategory
+  subCategory          String           // e.g. "Oversized Blazer", "Tailored Trousers"
+  
+  // Detected & User-Confirmed Attributes
+  primaryColorHex      String           // e.g. "#2B2E33"
+  primaryColorName     String           // e.g. "Charcoal"
+  secondaryColorHex    String?
+  pattern              String           @default("Solid") // Solid, Striped, Plaid, Floral, etc.
+  material             String?          // Linen, Silk, Wool, Denim, Cotton
+  formalityLevel       Formality        @default(CASUAL)
+  seasons              String[]         // ["SPRING", "AUTUMN"]
+  fitType              String?          // Slim, Regular, Relaxed, Oversized
+  
+  brand                String?
+  cost                 Decimal?         @db.Decimal(10, 2)
+  timesWorn            Int              @default(0)
+  isArchived           Boolean          @default(false)
+  
+  // ML Detection metadata
+  detectionConfidence  Json?            // Raw confidence scores from vision model
+  
+  outfitItems          OutfitItem[]
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@index([userId, category])
+  @@index([userId, isArchived])
+}
+
+model Merchant {
+  id                String       @id @default(uuid())
+  name              String       @unique
+  slug              String       @unique
+  homepageUrl       String
+  affiliateNetwork  String?      // e.g. "Impact", "ShareASale", "Rakuten", "Direct"
+  subIdParamName    String?      // e.g. "subId1" or "u1"
+  commissionRate    Decimal?     @db.Decimal(5, 2)
+  isActive          Boolean      @default(true)
+  
+  products          Product[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model Product {
+  id                String           @id @default(uuid())
+  merchantId        String
+  merchant          Merchant         @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  externalId        String           // Merchant's SKU or Product ID
+  title             String
+  brand             String
+  description       String?
+  
+  category          ClothingCategory
+  subCategory       String
+  styleCategory     String?          // e.g. "Casual", "Party", "Traditional", "Ethnic", "Formal", "Office", "Wedding", "Festive", "Streetwear", "Sportswear"
+  primaryColorHex   String
+  primaryColorName  String
+  pattern           String           @default("Solid")
+  formalityLevel    Formality        @default(SMART_CASUAL)
+  seasons           String[]
+  
+  price             Decimal          @db.Decimal(10, 2)
+  currency          String           @default("USD")
+  retailPrice       Decimal?         @db.Decimal(10, 2)
+  inStock           Boolean          @default(true)
+  
+  productUrl        String           // Base landing page
+  affiliateUrl      String?          // Pre-computed or template redirect
+  imageUrls         String[]         // High-res product images
+  lastPriceVerified DateTime?        @default(now())
+  
+  outfitItems       OutfitItem[]
+  wishlistItems     WishlistItem[]
+  
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@unique([merchantId, externalId])
+  @@index([category, price])
+  @@index([styleCategory])
+  @@index([brand])
+  @@index([primaryColorName])
+}
+
+model Outfit {
+  id                   String        @id @default(uuid())
+  userId               String
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name                 String
+  occasion             String        // e.g. "Work Presentation", "Weekend Brunch"
+  season               String?
+  targetFormality      Formality     @default(CASUAL)
+  
+  // Deterministic Scoring Breakdown
+  overallScore         Float         // 0 - 100
+  colorHarmonyScore    Float         // 0 - 100
+  silhouetteScore      Float         // 0 - 100
+  formalityScore       Float         // 0 - 100
+  ruleBreakdown        Json          // Explainability payload for audit and UI
+  
+  // AI-generated natural language styling advice (swappable provider)
+  stylingAdvice        String?       @db.Text
+  
+  isCurated            Boolean       @default(false)
+  isUserCreated        Boolean       @default(false)
+  
+  items                OutfitItem[]
+  savedOutfits         SavedOutfit[]
+  recommendationLogs   RecommendationLog[]
+  
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@index([userId, overallScore])
+}
+
+model OutfitItem {
+  id               String        @id @default(uuid())
+  outfitId         String
+  outfit           Outfit        @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+  
+  wardrobeItemId   String?
+  wardrobeItem     WardrobeItem? @relation(fields: [wardrobeItemId], references: [id], onDelete: SetNull)
+  
+  productId        String?
+  product          Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  
+  slotType         ClothingCategory
+  layerOrder       Int           @default(1) // 1: base layer, 2: mid layer, 3: outerwear
+
+  @@index([outfitId])
+  @@index([wardrobeItemId])
+  @@index([productId])
+}
+
+model SavedOutfit {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outfitId  String
+  outfit    Outfit   @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, outfitId])
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
+
+model RecommendationLog {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outfitId       String
+  outfit         Outfit    @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+  
+  context        Json      // Occasion, weather, budget constraint requested
+  userRating     Int?      // 1 (Dislike) to 5 (Love)
+  feedbackTags   String[]  // ["too_formal", "clashing_colors", "too_expensive"]
+  feedbackText   String?
+  
+  createdAt      DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String   // e.g. "USER_REGISTERED", "DATA_DELETION_REQUESTED", "PROFILE_PURGED"
+  ipAddress  String?
+  userAgent  String?
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([action, createdAt])
+}

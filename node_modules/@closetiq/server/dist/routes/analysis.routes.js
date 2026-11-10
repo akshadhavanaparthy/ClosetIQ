@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const analysis_controller_js_1 = require("../controllers/analysis.controller.js");
+const authenticate_js_1 = require("../middleware/authenticate.js");
+const validateRequest_js_1 = require("../middleware/validateRequest.js");
+const shared_types_1 = require("@closetiq/shared-types");
+const router = (0, express_1.Router)();
+router.use(authenticate_js_1.authenticate);
+router.post('/upload-ticket', (req, res, next) => analysis_controller_js_1.analysisController.getUploadTicket(req, res).catch(next));
+router.post('/process-body', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.ProcessBodyAnalysisSchema }), (req, res, next) => analysis_controller_js_1.analysisController.processBody(req, res).catch(next));
+router.post('/process-portrait', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.ProcessPortraitAnalysisSchema }), (req, res, next) => analysis_controller_js_1.analysisController.processPortrait(req, res).catch(next));
+router.get('/latest', (req, res, next) => analysis_controller_js_1.analysisController.getLatest(req, res).catch(next));
+router.post('/confirm', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.ConfirmAnalysisSchema }), (req, res, next) => analysis_controller_js_1.analysisController.confirm(req, res).catch(next));
+exports.default = router;

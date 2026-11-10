@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const privacy_controller_js_1 = require("../controllers/privacy.controller.js");
+const authenticate_js_1 = require("../middleware/authenticate.js");
+const router = (0, express_1.Router)();
+router.use(authenticate_js_1.authenticate);
+router.get('/export-data', (req, res, next) => privacy_controller_js_1.privacyController.exportData(req, res).catch(next));
+router.post('/delete-account', (req, res, next) => privacy_controller_js_1.privacyController.deleteAccount(req, res).catch(next));
+exports.default = router;

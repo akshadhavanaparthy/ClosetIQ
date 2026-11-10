@@ -1,0 +1,30 @@
+{
+  "name": "closetiq",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ClosetIQ Production AI Fashion & Personal Styling Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=@closetiq/web",
+    "dev:server": "npm run dev --workspace=@closetiq/server",
+    "build:types": "npm run build --workspace=@closetiq/shared-types",
+    "build:db": "npm run build --workspace=@closetiq/database",
+    "prisma:generate": "prisma generate --schema=./packages/database/prisma/schema.prisma",
+    "prisma:seed": "tsx ./packages/database/prisma/seed.ts",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.3.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "prisma": "^6.3.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.1"
+  }
+}

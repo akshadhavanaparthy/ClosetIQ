@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const outfit_controller_js_1 = require("../controllers/outfit.controller.js");
+const authenticate_js_1 = require("../middleware/authenticate.js");
+const router = (0, express_1.Router)();
+router.use(authenticate_js_1.authenticate);
+router.get('/', (req, res, next) => outfit_controller_js_1.outfitController.list(req, res).catch(next));
+router.post('/', (req, res, next) => outfit_controller_js_1.outfitController.create(req, res).catch(next));
+router.get('/:id', (req, res, next) => outfit_controller_js_1.outfitController.getById(req, res).catch(next));
+router.delete('/:id', (req, res, next) => outfit_controller_js_1.outfitController.delete(req, res).catch(next));
+exports.default = router;

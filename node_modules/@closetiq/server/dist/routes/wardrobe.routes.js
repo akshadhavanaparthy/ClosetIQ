@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const wardrobe_controller_js_1 = require("../controllers/wardrobe.controller.js");
+const authenticate_js_1 = require("../middleware/authenticate.js");
+const validateRequest_js_1 = require("../middleware/validateRequest.js");
+const shared_types_1 = require("@closetiq/shared-types");
+const router = (0, express_1.Router)();
+router.use(authenticate_js_1.authenticate);
+router.get('/', (0, validateRequest_js_1.validateRequest)({ query: shared_types_1.WardrobeQuerySchema }), (req, res, next) => wardrobe_controller_js_1.wardrobeController.getItems(req, res).catch(next));
+router.post('/', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.CreateWardrobeItemSchema }), (req, res, next) => wardrobe_controller_js_1.wardrobeController.createItem(req, res).catch(next));
+router.get('/:id', (req, res, next) => wardrobe_controller_js_1.wardrobeController.getItemById(req, res).catch(next));
+router.patch('/:id', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.UpdateWardrobeItemSchema }), (req, res, next) => wardrobe_controller_js_1.wardrobeController.updateItem(req, res).catch(next));
+router.delete('/:id', (req, res, next) => wardrobe_controller_js_1.wardrobeController.deleteItem(req, res).catch(next));
+exports.default = router;

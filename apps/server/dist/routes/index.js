@@ -1,0 +1,26 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_routes_js_1 = __importDefault(require("./auth.routes.js"));
+const profile_routes_js_1 = __importDefault(require("./profile.routes.js"));
+const analysis_routes_js_1 = __importDefault(require("./analysis.routes.js"));
+const wardrobe_routes_js_1 = __importDefault(require("./wardrobe.routes.js"));
+const recommendation_routes_js_1 = __importDefault(require("./recommendation.routes.js"));
+const discovery_routes_js_1 = __importDefault(require("./discovery.routes.js"));
+const outfit_routes_js_1 = __importDefault(require("./outfit.routes.js"));
+const merchant_routes_js_1 = __importDefault(require("./merchant.routes.js"));
+const privacy_routes_js_1 = __importDefault(require("./privacy.routes.js"));
+const router = (0, express_1.Router)();
+router.use('/auth', auth_routes_js_1.default);
+router.use('/profile', profile_routes_js_1.default);
+router.use('/analysis', analysis_routes_js_1.default);
+router.use('/wardrobe', wardrobe_routes_js_1.default);
+router.use('/recommendations', recommendation_routes_js_1.default);
+router.use('/discovery', discovery_routes_js_1.default);
+router.use('/outfits', outfit_routes_js_1.default);
+router.use('/merchants', merchant_routes_js_1.default);
+router.use('/privacy', privacy_routes_js_1.default);
+exports.default = router;

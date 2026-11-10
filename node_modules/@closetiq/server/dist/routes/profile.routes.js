@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const profile_controller_js_1 = require("../controllers/profile.controller.js");
+const authenticate_js_1 = require("../middleware/authenticate.js");
+const validateRequest_js_1 = require("../middleware/validateRequest.js");
+const shared_types_1 = require("@closetiq/shared-types");
+const router = (0, express_1.Router)();
+router.use(authenticate_js_1.authenticate);
+router.get('/me', (req, res, next) => profile_controller_js_1.profileController.getMe(req, res).catch(next));
+router.patch('/me', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.UpdateProfileSchema }), (req, res, next) => profile_controller_js_1.profileController.updateMe(req, res).catch(next));
+exports.default = router;

@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const discovery_controller_js_1 = require("../controllers/discovery.controller.js");
+const authenticate_js_1 = require("../middleware/authenticate.js");
+const validateRequest_js_1 = require("../middleware/validateRequest.js");
+const shared_types_1 = require("@closetiq/shared-types");
+const router = (0, express_1.Router)();
+router.get('/search', authenticate_js_1.optionalAuthenticate, (0, validateRequest_js_1.validateRequest)({ query: shared_types_1.ProductQuerySchema }), (req, res, next) => discovery_controller_js_1.discoveryController.search(req, res).catch(next));
+router.get('/wishlist', authenticate_js_1.authenticate, (req, res, next) => discovery_controller_js_1.discoveryController.getWishlist(req, res).catch(next));
+router.post('/wishlist/:productId', authenticate_js_1.authenticate, (req, res, next) => discovery_controller_js_1.discoveryController.addToWishlist(req, res).catch(next));
+router.delete('/wishlist/:productId', authenticate_js_1.authenticate, (req, res, next) => discovery_controller_js_1.discoveryController.removeFromWishlist(req, res).catch(next));
+router.get('/:id', authenticate_js_1.optionalAuthenticate, (req, res, next) => discovery_controller_js_1.discoveryController.getById(req, res).catch(next));
+exports.default = router;

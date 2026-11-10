@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const recommendation_controller_js_1 = require("../controllers/recommendation.controller.js");
+const authenticate_js_1 = require("../middleware/authenticate.js");
+const validateRequest_js_1 = require("../middleware/validateRequest.js");
+const shared_types_1 = require("@closetiq/shared-types");
+const router = (0, express_1.Router)();
+router.use(authenticate_js_1.authenticate);
+router.post('/complete-my-outfit', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.CompleteMyOutfitSchema }), (req, res, next) => recommendation_controller_js_1.recommendationController.completeMyOutfit(req, res).catch(next));
+router.post('/daily', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.DailyRecommendationsSchema }), (req, res, next) => recommendation_controller_js_1.recommendationController.daily(req, res).catch(next));
+router.post('/feedback', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.RecommendationFeedbackSchema }), (req, res, next) => recommendation_controller_js_1.recommendationController.feedback(req, res).catch(next));
+exports.default = router;

@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_controller_js_1 = require("../controllers/auth.controller.js");
+const validateRequest_js_1 = require("../middleware/validateRequest.js");
+const shared_types_1 = require("@closetiq/shared-types");
+const router = (0, express_1.Router)();
+router.post('/register', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.RegisterRequestSchema }), (req, res, next) => auth_controller_js_1.authController.register(req, res).catch(next));
+router.post('/login', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.LoginRequestSchema }), (req, res, next) => auth_controller_js_1.authController.login(req, res).catch(next));
+router.post('/refresh', (req, res, next) => auth_controller_js_1.authController.refresh(req, res).catch(next));
+router.post('/logout', (req, res, next) => auth_controller_js_1.authController.logout(req, res).catch(next));
+exports.default = router;

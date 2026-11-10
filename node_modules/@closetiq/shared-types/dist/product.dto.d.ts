@@ -1,0 +1,97 @@
+import { z } from 'zod';
+import { ClothingCategorySchema, FormalitySchema } from './wardrobe.dto.js';
+export declare const MerchantSchema: z.ZodObject<{
+    id: z.ZodString;
+    name: z.ZodString;
+    slug: z.ZodString;
+    homepageUrl: z.ZodString;
+    commissionRate: z.ZodNullable<z.ZodOptional<z.ZodNumber>>;
+    isActive: z.ZodBoolean;
+}, "strip", z.ZodTypeAny, {
+    name: string;
+    id: string;
+    slug: string;
+    homepageUrl: string;
+    isActive: boolean;
+    commissionRate?: number | null | undefined;
+}, {
+    name: string;
+    id: string;
+    slug: string;
+    homepageUrl: string;
+    isActive: boolean;
+    commissionRate?: number | null | undefined;
+}>;
+export type MerchantDto = z.infer<typeof MerchantSchema>;
+export declare const ProductSortBySchema: z.ZodEnum<["recommended", "price_asc", "price_desc", "newest"]>;
+export type ProductSortBy = z.infer<typeof ProductSortBySchema>;
+export declare const ProductQuerySchema: z.ZodObject<{
+    category: z.ZodOptional<z.ZodEnum<["TOP", "BOTTOM", "DRESS", "OUTERWEAR", "FOOTWEAR", "ACCESSORY", "BAG"]>>;
+    brand: z.ZodOptional<z.ZodString>;
+    brands: z.ZodOptional<z.ZodString>;
+    styleCategory: z.ZodOptional<z.ZodString>;
+    formalityLevel: z.ZodOptional<z.ZodEnum<["CASUAL", "SMART_CASUAL", "BUSINESS_CASUAL", "BUSINESS_FORMAL", "BLACK_TIE"]>>;
+    priceMin: z.ZodOptional<z.ZodNumber>;
+    priceMax: z.ZodOptional<z.ZodNumber>;
+    color: z.ZodOptional<z.ZodString>;
+    search: z.ZodOptional<z.ZodString>;
+    sortBy: z.ZodOptional<z.ZodEnum<["recommended", "price_asc", "price_desc", "newest"]>>;
+    page: z.ZodDefault<z.ZodNumber>;
+    pageSize: z.ZodDefault<z.ZodNumber>;
+}, "strip", z.ZodTypeAny, {
+    page: number;
+    pageSize: number;
+    category?: "TOP" | "BOTTOM" | "DRESS" | "OUTERWEAR" | "FOOTWEAR" | "ACCESSORY" | "BAG" | undefined;
+    formalityLevel?: "CASUAL" | "SMART_CASUAL" | "BUSINESS_CASUAL" | "BUSINESS_FORMAL" | "BLACK_TIE" | undefined;
+    brand?: string | undefined;
+    search?: string | undefined;
+    brands?: string | undefined;
+    styleCategory?: string | undefined;
+    priceMin?: number | undefined;
+    priceMax?: number | undefined;
+    color?: string | undefined;
+    sortBy?: "recommended" | "price_asc" | "price_desc" | "newest" | undefined;
+}, {
+    category?: "TOP" | "BOTTOM" | "DRESS" | "OUTERWEAR" | "FOOTWEAR" | "ACCESSORY" | "BAG" | undefined;
+    formalityLevel?: "CASUAL" | "SMART_CASUAL" | "BUSINESS_CASUAL" | "BUSINESS_FORMAL" | "BLACK_TIE" | undefined;
+    brand?: string | undefined;
+    search?: string | undefined;
+    page?: number | undefined;
+    pageSize?: number | undefined;
+    brands?: string | undefined;
+    styleCategory?: string | undefined;
+    priceMin?: number | undefined;
+    priceMax?: number | undefined;
+    color?: string | undefined;
+    sortBy?: "recommended" | "price_asc" | "price_desc" | "newest" | undefined;
+}>;
+export type ProductQueryDto = z.infer<typeof ProductQuerySchema>;
+export interface ProductDto {
+    id: string;
+    merchantId: string;
+    merchantName?: string;
+    externalId: string;
+    title: string;
+    brand: string;
+    description: string | null;
+    category: z.infer<typeof ClothingCategorySchema>;
+    subCategory: string;
+    styleCategory?: string | null;
+    primaryColorHex: string;
+    primaryColorName: string;
+    pattern: string;
+    formalityLevel: z.infer<typeof FormalitySchema>;
+    seasons: string[];
+    price: number;
+    currency: string;
+    retailPrice: number | null;
+    inStock: boolean;
+    productUrl: string;
+    affiliateUrl: string | null;
+    imageUrls: string[];
+    occasionTags?: string[];
+    availableSizes?: string[];
+    lastPriceVerified?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
