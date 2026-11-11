@@ -3,6 +3,8 @@ import { AuthModal } from './components/AuthModal';
 import { EditorialHeader } from './components/EditorialHeader';
 import { LegalPage } from './components/LegalPage';
 import { SiteFooter } from './components/SiteFooter';
+import { CatalogAdminPage } from './components/CatalogAdminPage';
+import { ProductDiscovery } from './components/ProductDiscovery';
 import { api, UserSession } from './services/api';
 import {
   ProfileResponseDto,
@@ -25,14 +27,35 @@ export const App: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [session, setSession] = useState<UserSession | null>(() => api.getCurrentUser());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
   const hasActiveSession = Boolean(
     session &&
+    session.token &&
     session.token !== 'mock-jwt-token-2026' &&
     !session.token.startsWith('demo-token-')
   );
 
   useEffect(() => {
+    let active = true;
+    api.restoreSession()
+      .then((user) => {
+        if (active) setSession(user);
+      })
+      .catch((error: unknown) => {
+        console.error('ClosetIQ session restoration:', error);
+        if (active) setLoadError('Your session could not be restored. Please sign in again.');
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     async function loadInitialData() {
+      if (path === '/admin/catalog') {
+        setLoading(false);
+        return;
+      }
       if (!hasActiveSession) {
         setLoading(false);
         return;
@@ -71,11 +94,13 @@ export const App: React.FC = () => {
     }
 
     loadInitialData();
-  }, [hasActiveSession]);
+  }, [hasActiveSession, path]);
 
-  const path = window.location.pathname.replace(/\/+$/, '') || '/';
   if (path === '/privacy') return <LegalPage kind="privacy" />;
   if (path === '/terms') return <LegalPage kind="terms" />;
+  if (path === '/admin/catalog') {
+    return <CatalogAdminPage session={hasActiveSession ? session : null} onAuthSuccess={setSession} />;
+  }
 
   return (
     <div className="min-h-screen bg-linen text-obsidian">
@@ -88,6 +113,15 @@ export const App: React.FC = () => {
         isAuthenticated={hasActiveSession}
         userName={session?.fullName}
         onOpenAuth={() => setIsAuthModalOpen(true)}
+        onLogout={() => {
+          api.logout()
+            .then(() => setSession(null))
+            .catch((error: unknown) => {
+              console.error('ClosetIQ sign out:', error);
+              setSession(null);
+              setLoadError('Sign out could not be completed. Please try again.');
+            });
+        }}
       />
 
       <main id="main-content" className="container py-8">
@@ -694,27 +728,10 @@ export const App: React.FC = () => {
             )}
 
             {currentTab === 'discovery' && (
-              <div className="space-y-8 animate-fade-in">
-                <div
-                  className="flex justify-between items-end pb-6"
-                  style={{ borderBottom: '1px solid var(--border-stone)' }}
-                >
-                  <div>
-                    <span className="editorial-caps text-terracotta">Product discovery</span>
-                    <h1 className="editorial-title text-4xl font-light text-obsidian mt-1">
-                      Discover pieces
-                    </h1>
-                    <p className="text-sm text-muted mt-1">
-                      Browse products from a connected merchant catalog.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="empty-state">
-                  <h2>No products to show</h2>
-                  <p>[TODO: connect a verified merchant catalog before launch.]</p>
-                </div>
-              </div>
+              <ProductDiscovery
+                isAuthenticated={hasActiveSession}
+                onOpenAuth={() => setIsAuthModalOpen(true)}
+              />
             )}
           </>
         )}

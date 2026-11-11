@@ -9,17 +9,16 @@ exports.verifyAccessToken = verifyAccessToken;
 exports.verifyRefreshToken = verifyRefreshToken;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const errors_js_1 = require("./errors.js");
-const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'closetiq_super_secret_access_key_2026_dev_mode';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'closetiq_super_secret_refresh_key_2026_dev_mode';
+const index_js_1 = require("../config/index.js");
 function signAccessToken(payload) {
-    return jsonwebtoken_1.default.sign(payload, JWT_ACCESS_SECRET, { expiresIn: '15m' });
+    return jsonwebtoken_1.default.sign(payload, index_js_1.config.jwtAccessSecret, { expiresIn: '15m' });
 }
 function signRefreshToken(userId) {
-    return jsonwebtoken_1.default.sign({ userId }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
+    return jsonwebtoken_1.default.sign({ userId }, index_js_1.config.jwtRefreshSecret, { expiresIn: '7d' });
 }
 function verifyAccessToken(token) {
     try {
-        return jsonwebtoken_1.default.verify(token, JWT_ACCESS_SECRET);
+        return jsonwebtoken_1.default.verify(token, index_js_1.config.jwtAccessSecret);
     }
     catch (err) {
         throw new errors_js_1.UnauthorizedError('Invalid or expired access token', err);
@@ -27,7 +26,7 @@ function verifyAccessToken(token) {
 }
 function verifyRefreshToken(token) {
     try {
-        return jsonwebtoken_1.default.verify(token, JWT_REFRESH_SECRET);
+        return jsonwebtoken_1.default.verify(token, index_js_1.config.jwtRefreshSecret);
     }
     catch (err) {
         throw new errors_js_1.UnauthorizedError('Invalid or expired refresh token', err);

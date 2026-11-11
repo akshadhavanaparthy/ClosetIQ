@@ -8,6 +8,7 @@ import discoveryRoutes from './discovery.routes.js';
 import outfitRoutes from './outfit.routes.js';
 import merchantRoutes from './merchant.routes.js';
 import privacyRoutes from './privacy.routes.js';
+import catalogAdminRoutes from './catalogAdmin.routes.js';
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use('/discovery', discoveryRoutes);
 router.use('/outfits', outfitRoutes);
 router.use('/merchants', merchantRoutes);
 router.use('/privacy', privacyRoutes);
+router.use('/admin/catalog', catalogAdminRoutes);
 
 export default router;

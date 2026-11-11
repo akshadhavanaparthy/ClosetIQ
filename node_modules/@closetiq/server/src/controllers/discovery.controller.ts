@@ -27,6 +27,15 @@ export class DiscoveryController {
     });
   }
 
+  async getSizes(_req: AuthenticatedRequest, res: Response): Promise<void> {
+    const sizes = await discoveryService.getSizes();
+    res.json({
+      success: true,
+      data: sizes,
+      meta: { timestamp: new Date().toISOString() },
+    });
+  }
+
   async getById(req: AuthenticatedRequest, res: Response): Promise<void> {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const product = await discoveryService.getProductById(id);

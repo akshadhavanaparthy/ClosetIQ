@@ -6,6 +6,11 @@ import {
   ProfileResponseDto,
   CompleteMyOutfitDto,
   CreateWardrobeItemDto,
+  CreateCatalogProductDto,
+  CreateMerchantDto,
+  MerchantDto,
+  UpdateCatalogProductDto,
+  VerifyCatalogProductDto,
 } from '@closetiq/shared-types';
 
 const API_BASE = '/api/v1';
@@ -70,16 +75,48 @@ function setStored<T>(key: string, value: T): void {
   }
 }
 
-// --- STATE STORE (SYNCHRONIZED WITH LOCALSTORAGE) ---
-let sessionState: UserSession | null = getStored<UserSession | null>('session', null);
-if (sessionState?.token === 'mock-jwt-token-2026' || sessionState?.token.startsWith('demo-token-')) {
+// Refresh tokens remain in HttpOnly cookies. Access tokens stay in memory only.
+type StoredSessionIdentity = Omit<UserSession, 'token'>;
+const storedIdentity = getStored<StoredSessionIdentity | null>('session_identity', null)
+  || (() => {
+    const legacySession = getStored<UserSession | null>('session', null);
+    if (!legacySession) return null;
+    const { id, email, fullName, role } = legacySession;
+    return { id, email, fullName, role };
+  })();
+try {
+  localStorage.removeItem('closetiq_session');
+} catch (error) {
+  console.warn('Could not remove the legacy session token from local storage:', error);
+}
+let sessionState: UserSession | null = storedIdentity ? { ...storedIdentity, token: '' } : null;
+let refreshInFlight: Promise<UserSession | null> | null = null;
+
+function persistSession(user: UserSession): void {
+  sessionState = user;
+  const { id, email, fullName, role } = user;
+  setStored('session_identity', { id, email, fullName, role });
+  try {
+    localStorage.removeItem('closetiq_session');
+  } catch (error) {
+    console.warn('Could not remove the legacy session token from local storage:', error);
+  }
+}
+
+function clearSession(): void {
   sessionState = null;
+  try {
+    localStorage.removeItem('closetiq_session');
+    localStorage.removeItem('closetiq_session_identity');
+  } catch (error) {
+    console.warn('Could not clear the local session identity:', error);
+  }
 }
 
 let profileState: ProfileResponseDto | null = getStored<ProfileResponseDto | null>('profile', null);
 let wardrobeState: WardrobeItemDto[] = getStored<WardrobeItemDto[]>('wardrobe', []);
 let catalogState: ProductDto[] = [];
-let wishlistState: string[] = getStored<string[]>('wishlist', []);
+let wishlistState: string[] = [];
 let savedOutfitsState: OutfitDto[] = getStored<OutfitDto[]>('saved_outfits', []);
 let cartState: CartItem[] = getStored<CartItem[]>('cart', []);
 let ordersState: OrderRecord[] = getStored<OrderRecord[]>('orders', []);
@@ -88,6 +125,56 @@ let auditLogsState: AuditLogEntry[] = getStored<AuditLogEntry[]>('audit_logs', [
 const getAuthHeaders = (): HeadersInit =>
   sessionState?.token ? { Authorization: `Bearer ${sessionState.token}` } : {};
 
+async function refreshSession(): Promise<UserSession | null> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    const res = await globalThis.fetch(`${API_BASE}/auth/refresh`, { method: 'POST', credentials: 'include' });
+    if (res.status === 401) {
+      clearSession();
+      return null;
+    }
+    if (!res.ok) throw new Error(`Session refresh failed (${res.status}).`);
+
+    const json = await res.json();
+    const user: UserSession = {
+      id: json.data.user.id,
+      email: json.data.user.email,
+      fullName: json.data.user.fullName || json.data.user.email.split('@')[0],
+      role: json.data.user.role,
+      token: json.data.accessToken,
+    };
+    persistSession(user);
+    return user;
+  })();
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
+  }
+}
+
+async function authenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const send = () => {
+    const headers = new Headers(init.headers);
+    if (sessionState?.token) headers.set('Authorization', `******`);
+    return globalThis.fetch(input, { ...init, headers, credentials: 'include' });
+  };
+  let response = await send();
+  if (response.status === 401) {
+    const refreshedUser = await refreshSession();
+    if (refreshedUser) response = await send();
+  }
+  return response;
+}
+
+const fetch = (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  if (url.includes(`${API_BASE}/auth/`)) {
+    return globalThis.fetch(input, { ...init, credentials: 'include' });
+  }
+  return authenticatedFetch(input, init);
+};
+
 // --- COMPLETE API CLIENT ---
 export const api = {
   // Session & Authentication
@@ -95,11 +182,18 @@ export const api = {
     return sessionState;
   },
 
+  async restoreSession(): Promise<UserSession | null> {
+    if (sessionState?.token) return sessionState;
+    if (!sessionState) return null;
+    return refreshSession();
+  },
+
   async login(email: string, password: string): Promise<UserSession> {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
+      credentials: 'include',
     });
     if (!res.ok) {
       throw new Error(`Sign-in failed (${res.status}).`);
@@ -110,10 +204,9 @@ export const api = {
       email: json.data.user.email,
       fullName: json.data.user.profile?.fullName || email.split('@')[0],
       role: json.data.user.role || 'USER',
-      token: json.data.accessToken,
+      token: json.data.tokens.accessToken,
     };
-    sessionState = user;
-    setStored('session', user);
+    persistSession(user);
     this.logAudit('USER_LOGIN', 'Logged in via API', user.email);
     return user;
   },
@@ -123,6 +216,7 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fullName: name, email, password }),
+      credentials: 'include',
     });
     if (!res.ok) {
       throw new Error(`Account creation failed (${res.status}).`);
@@ -133,20 +227,23 @@ export const api = {
       email: json.data.user.email,
       fullName: name,
       role: 'USER',
-      token: json.data.accessToken,
+      token: json.data.tokens.accessToken,
     };
-    sessionState = user;
-    setStored('session', user);
+    persistSession(user);
     this.logAudit('USER_REGISTERED', 'Account created via API', user.email);
     return user;
   },
 
-  logout(): void {
+  async logout(): Promise<void> {
     if (sessionState) {
       this.logAudit('USER_LOGOUT', `Logged out`, sessionState.email);
     }
-    sessionState = null;
-    localStorage.removeItem('closetiq_session');
+    try {
+      const res = await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' });
+      if (!res.ok && res.status !== 401) throw new Error(`Sign-out failed (${res.status}).`);
+    } finally {
+      clearSession();
+    }
   },
 
   // Profile
@@ -221,11 +318,31 @@ export const api = {
   },
 
   // Catalog & Discovery
-  async getCatalog(query?: { search?: string; category?: string; priceMax?: number }): Promise<ProductDto[]> {
+  async getCatalog(query?: {
+    search?: string;
+    category?: string;
+    displayCategory?: string;
+    priceMin?: number;
+    priceMax?: number;
+    brand?: string;
+    color?: string;
+    size?: string;
+    sortBy?: 'recommended' | 'price_asc' | 'price_desc' | 'newest';
+    pageSize?: number;
+  }): Promise<ProductDto[]> {
     const searchParams = new URLSearchParams();
     if (query?.search) searchParams.set('search', query.search);
     if (query?.category && query.category !== 'ALL') searchParams.set('category', query.category);
+    if (query?.displayCategory && query.displayCategory !== 'All') {
+      searchParams.set('displayCategory', query.displayCategory);
+    }
+    if (query?.priceMin !== undefined) searchParams.set('priceMin', String(query.priceMin));
     if (query?.priceMax !== undefined) searchParams.set('priceMax', String(query.priceMax));
+    if (query?.brand) searchParams.set('brand', query.brand);
+    if (query?.color) searchParams.set('color', query.color);
+    if (query?.size) searchParams.set('size', query.size);
+    if (query?.sortBy) searchParams.set('sortBy', query.sortBy);
+    if (query?.pageSize) searchParams.set('pageSize', String(query.pageSize));
 
     const queryString = searchParams.toString();
     const url = `${API_BASE}/discovery/search${queryString ? `?${queryString}` : ''}`;
@@ -236,6 +353,88 @@ export const api = {
     const json = await res.json();
     catalogState = json.data;
     return catalogState;
+  },
+
+  async getCatalogBrands(): Promise<string[]> {
+    const res = await fetch(`${API_BASE}/discovery/brands`);
+    if (!res.ok) throw new Error(`Catalog brands request failed (${res.status}).`);
+    const json = await res.json();
+    return json.data;
+  },
+
+  async getCatalogSizes(): Promise<string[]> {
+    const res = await fetch(`${API_BASE}/discovery/sizes`);
+    if (!res.ok) throw new Error(`Catalog sizes request failed (${res.status}).`);
+    const json = await res.json();
+    return json.data;
+  },
+
+  async getAdminMerchants(): Promise<MerchantDto[]> {
+    const res = await fetch(`${API_BASE}/admin/catalog/merchants`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(`Merchant list request failed (${res.status}).`);
+    const json = await res.json();
+    return json.data;
+  },
+
+  async createAdminMerchant(merchant: CreateMerchantDto): Promise<MerchantDto> {
+    const res = await fetch(`${API_BASE}/admin/catalog/merchants`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(merchant),
+    });
+    if (!res.ok) throw new Error(`Merchant could not be saved (${res.status}).`);
+    const json = await res.json();
+    return json.data;
+  },
+
+  async getAdminProducts(): Promise<ProductDto[]> {
+    const res = await fetch(`${API_BASE}/admin/catalog/products`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(`Product list request failed (${res.status}).`);
+    const json = await res.json();
+    return json.data;
+  },
+
+  async createAdminProduct(product: CreateCatalogProductDto): Promise<ProductDto> {
+    const res = await fetch(`${API_BASE}/admin/catalog/products`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(product),
+    });
+    if (!res.ok) throw new Error(`Product could not be saved (${res.status}).`);
+    const json = await res.json();
+    return json.data;
+  },
+
+  async updateAdminProduct(id: string, updates: UpdateCatalogProductDto): Promise<ProductDto> {
+    const res = await fetch(`${API_BASE}/admin/catalog/products/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error(`Product could not be updated (${res.status}).`);
+    const json = await res.json();
+    return json.data;
+  },
+
+  async verifyAdminProduct(id: string, verification: VerifyCatalogProductDto): Promise<ProductDto> {
+    const res = await fetch(`${API_BASE}/admin/catalog/products/${encodeURIComponent(id)}/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(verification),
+    });
+    if (!res.ok) throw new Error(`Product verification failed (${res.status}).`);
+    const json = await res.json();
+    return json.data;
+  },
+
+  async markAdminProductUnavailable(id: string): Promise<ProductDto> {
+    const res = await fetch(`${API_BASE}/admin/catalog/products/${encodeURIComponent(id)}/unavailable`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error(`Product availability could not be updated (${res.status}).`);
+    const json = await res.json();
+    return json.data;
   },
 
   async getProductById(id: string): Promise<ProductDto | null> {
@@ -258,18 +457,23 @@ export const api = {
 
   // Wishlist
   async getWishlist(): Promise<ProductDto[]> {
-    return catalogState.filter((p) => wishlistState.includes(p.id));
+    const res = await fetch(`${API_BASE}/discovery/wishlist`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(`Wishlist request failed (${res.status}).`);
+    const json = await res.json();
+    wishlistState = (json.data as ProductDto[]).map((product) => product.id);
+    return json.data;
   },
 
-  async toggleWishlist(productId: string): Promise<boolean> {
-    const exists = wishlistState.includes(productId);
-    if (exists) {
-      wishlistState = wishlistState.filter((id) => id !== productId);
-    } else {
-      wishlistState.push(productId);
-    }
-    setStored('wishlist', wishlistState);
-    return !exists;
+  async toggleWishlist(productId: string, currentlySaved = wishlistState.includes(productId)): Promise<boolean> {
+    const res = await fetch(`${API_BASE}/discovery/wishlist/${encodeURIComponent(productId)}`, {
+      method: currentlySaved ? 'DELETE' : 'POST',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error(`Wishlist update failed (${res.status}).`);
+    wishlistState = currentlySaved
+      ? wishlistState.filter((id) => id !== productId)
+      : [...wishlistState, productId];
+    return !currentlySaved;
   },
 
   // Saved Outfits

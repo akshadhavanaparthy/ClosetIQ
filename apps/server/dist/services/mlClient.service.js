@@ -51,33 +51,6 @@ class MLClientService {
             throw new errors_js_1.ServiceUnavailableError('AI Skin Tone & Palette model service is currently offline or unreachable. Please verify ML service status.');
         }
     }
-    async detectGarmentAttributes(imageKey) {
-        try {
-            const response = await fetch(`${this.baseUrl}/api/v1/garment/detect`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': this.apiKey,
-                },
-                body: JSON.stringify({ imageKey }),
-            });
-            if (response.ok) {
-                return (await response.json());
-            }
-        }
-        catch (err) {
-            logger_js_1.logger.warn('ML Service unreachable, using garment CV fallback:', err);
-        }
-        return {
-            category: 'TOP',
-            subCategory: 'Button-Up Shirts',
-            primaryColorHex: '#F7F6F2',
-            primaryColorName: 'Chalk White',
-            pattern: 'Solid',
-            formalityLevel: 'SMART_CASUAL',
-            confidence: 0.92,
-        };
-    }
 }
 exports.MLClientService = MLClientService;
 exports.mlClient = new MLClientService();

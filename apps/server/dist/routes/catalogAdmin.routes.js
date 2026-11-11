@@ -1,0 +1,18 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const shared_types_1 = require("@closetiq/shared-types");
+const authenticate_js_1 = require("../middleware/authenticate.js");
+const authorize_js_1 = require("../middleware/authorize.js");
+const validateRequest_js_1 = require("../middleware/validateRequest.js");
+const catalogAdmin_controller_js_1 = require("../controllers/catalogAdmin.controller.js");
+const router = (0, express_1.Router)();
+router.use(authenticate_js_1.authenticate, (0, authorize_js_1.authorize)('ADMIN'));
+router.get('/merchants', (req, res, next) => catalogAdmin_controller_js_1.catalogAdminController.listMerchants(req, res).catch(next));
+router.post('/merchants', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.CreateMerchantSchema }), (req, res, next) => catalogAdmin_controller_js_1.catalogAdminController.createMerchant(req, res).catch(next));
+router.get('/products', (req, res, next) => catalogAdmin_controller_js_1.catalogAdminController.listProducts(req, res).catch(next));
+router.post('/products', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.CreateCatalogProductSchema }), (req, res, next) => catalogAdmin_controller_js_1.catalogAdminController.createProduct(req, res).catch(next));
+router.patch('/products/:id', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.UpdateCatalogProductSchema }), (req, res, next) => catalogAdmin_controller_js_1.catalogAdminController.updateProduct(req, res).catch(next));
+router.post('/products/:id/verify', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.VerifyCatalogProductSchema }), (req, res, next) => catalogAdmin_controller_js_1.catalogAdminController.verifyProduct(req, res).catch(next));
+router.post('/products/:id/unavailable', (req, res, next) => catalogAdmin_controller_js_1.catalogAdminController.markUnavailable(req, res).catch(next));
+exports.default = router;

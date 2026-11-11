@@ -10,6 +10,10 @@ router.get('/brands', optionalAuthenticate, (req, res, next) =>
   discoveryController.getBrands(req, res).catch(next)
 );
 
+router.get('/sizes', optionalAuthenticate, (req, res, next) =>
+  discoveryController.getSizes(req, res).catch(next)
+);
+
 router.get('/search', optionalAuthenticate, validateRequest({ query: ProductQuerySchema }), (req, res, next) =>
   discoveryController.search(req, res).catch(next)
 );

@@ -36,6 +36,16 @@ class AuthService {
             email: user.email,
             role: user.role,
         });
+        const rawRefreshToken = (0, jwt_js_1.signRefreshToken)(user.id);
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
+        await database_1.prisma.refreshToken.create({
+            data: {
+                userId: user.id,
+                tokenHash: hashToken(rawRefreshToken),
+                expiresAt,
+            },
+        });
         // Record audit log
         await database_1.prisma.auditLog.create({
             data: {
@@ -45,16 +55,19 @@ class AuthService {
             },
         });
         return {
-            user: {
-                id: user.id,
-                email: user.email,
-                role: user.role,
-                isVerified: user.isVerified,
+            authResponse: {
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    role: user.role,
+                    isVerified: user.isVerified,
+                },
+                tokens: {
+                    accessToken,
+                    expiresIn: 900,
+                },
             },
-            tokens: {
-                accessToken,
-                expiresIn: 900,
-            },
+            rawRefreshToken,
         };
     }
     async login(dto) {
@@ -105,7 +118,7 @@ class AuthService {
         const tokenHash = hashToken(rawToken);
         const existingToken = await database_1.prisma.refreshToken.findUnique({
             where: { tokenHash },
-            include: { user: true },
+            include: { user: { include: { profile: true } } },
         });
         // Token reuse detection! If already revoked or not found, invalidate ALL refresh tokens for user
         if (!existingToken || existingToken.revokedAt || existingToken.expiresAt < new Date()) {
@@ -137,7 +150,16 @@ class AuthService {
                 expiresAt,
             },
         });
-        return { accessToken, newRawRefreshToken };
+        return {
+            accessToken,
+            newRawRefreshToken,
+            user: {
+                id: existingToken.user.id,
+                email: existingToken.user.email,
+                role: existingToken.user.role,
+                fullName: existingToken.user.profile?.fullName ?? null,
+            },
+        };
     }
     async logout(rawToken) {
         if (rawToken) {

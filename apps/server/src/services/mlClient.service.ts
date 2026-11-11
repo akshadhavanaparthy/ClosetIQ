@@ -22,17 +22,6 @@ export interface MLUndertoneResult {
   confidenceScore: number;
 }
 
-export interface MLGarmentDetectionResult {
-  category: string;
-  subCategory: string;
-  primaryColorHex: string;
-  primaryColorName: string;
-  secondaryColorHex?: string;
-  pattern: string;
-  formalityLevel: string;
-  confidence: number;
-}
-
 export class MLClientService {
   private baseUrl: string;
   private apiKey: string;
@@ -84,34 +73,6 @@ export class MLClientService {
     }
   }
 
-  async detectGarmentAttributes(imageKey: string): Promise<MLGarmentDetectionResult> {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/v1/garment/detect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': this.apiKey,
-        },
-        body: JSON.stringify({ imageKey }),
-      });
-
-      if (response.ok) {
-        return (await response.json()) as MLGarmentDetectionResult;
-      }
-    } catch (err) {
-      logger.warn('ML Service unreachable, using garment CV fallback:', err);
-    }
-
-    return {
-      category: 'TOP',
-      subCategory: 'Button-Up Shirts',
-      primaryColorHex: '#F7F6F2',
-      primaryColorName: 'Chalk White',
-      pattern: 'Solid',
-      formalityLevel: 'SMART_CASUAL',
-      confidence: 0.92,
-    };
-  }
 }
 
 export const mlClient = new MLClientService();

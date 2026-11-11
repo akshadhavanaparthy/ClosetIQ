@@ -1,6 +1,5 @@
 import { prisma, Prisma } from '@closetiq/database';
 import { CreateWardrobeItemDto, UpdateWardrobeItemDto, WardrobeQueryDto, WardrobeItemDto } from '@closetiq/shared-types';
-import { mlClient } from './mlClient.service.js';
 import { NotFoundError } from '../utils/errors.js';
 
 export class WardrobeService {
@@ -72,9 +71,6 @@ export class WardrobeService {
   }
 
   async createItem(userId: string, dto: CreateWardrobeItemDto): Promise<WardrobeItemDto> {
-    // Optionally trigger CV detection metadata if needed
-    const detection = await mlClient.detectGarmentAttributes(dto.imageKey);
-
     const item = await prisma.wardrobeItem.create({
       data: {
         userId,
@@ -92,7 +88,7 @@ export class WardrobeService {
         fitType: dto.fitType || null,
         brand: dto.brand || null,
         cost: dto.cost !== undefined && dto.cost !== null ? new Prisma.Decimal(dto.cost) : null,
-        detectionConfidence: detection as any,
+        detectionConfidence: Prisma.DbNull,
       },
     });
 

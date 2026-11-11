@@ -10,6 +10,7 @@ interface EditorialHeaderProps {
   isAuthenticated: boolean;
   userName?: string;
   onOpenAuth: () => void;
+  onLogout: () => void;
 }
 
 export const EditorialHeader: React.FC<EditorialHeaderProps> = ({
@@ -20,6 +21,7 @@ export const EditorialHeader: React.FC<EditorialHeaderProps> = ({
   isAuthenticated,
   userName,
   onOpenAuth,
+  onLogout,
 }) => {
   return (
     <header className="site-header">
@@ -93,7 +95,12 @@ export const EditorialHeader: React.FC<EditorialHeaderProps> = ({
 
         <div className="header-account" aria-live="polite">
           {isAuthenticated ? (
-            <span>{profile?.fullName || userName || 'Personal studio'}</span>
+            <>
+              <span>{profile?.fullName || userName || 'Personal studio'}</span>
+              <button type="button" className="header-auth-action" onClick={onLogout}>
+                Sign out
+              </button>
+            </>
           ) : (
             <button type="button" className="header-auth-action" onClick={onOpenAuth}>
               Sign in

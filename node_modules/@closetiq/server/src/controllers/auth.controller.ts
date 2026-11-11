@@ -2,13 +2,24 @@ import { Request, Response } from 'express';
 import { authService } from '../services/auth.service.js';
 import { ApiSuccessResponse } from '@closetiq/shared-types';
 import { config } from '../config/index.js';
+import { UnauthorizedError } from '../utils/errors.js';
 
 export class AuthController {
   async register(req: Request, res: Response): Promise<void> {
-    const result = await authService.register(req.body);
-    const response: ApiSuccessResponse<typeof result> = {
+    const { authResponse, rawRefreshToken } = await authService.register(req.body);
+
+    res.cookie('refreshToken', rawRefreshToken, {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/api/v1/auth',
+      domain: config.cookieDomain,
+    });
+
+    const response: ApiSuccessResponse<typeof authResponse> = {
       success: true,
-      data: result,
+      data: authResponse,
       meta: { timestamp: new Date().toISOString() },
     };
     res.status(201).json(response);
@@ -37,6 +48,10 @@ export class AuthController {
   async refresh(req: Request, res: Response): Promise<void> {
     const rawToken = req.cookies?.refreshToken;
     if (!rawToken) {
+      res.clearCookie('refreshToken', {
+        path: '/api/v1/auth',
+        domain: config.cookieDomain,
+      });
       res.status(401).json({
         success: false,
         error: { code: 'NO_REFRESH_TOKEN', message: 'Refresh token cookie required' },
@@ -45,7 +60,19 @@ export class AuthController {
       return;
     }
 
-    const { accessToken, newRawRefreshToken } = await authService.refreshToken(rawToken);
+    let tokenData: Awaited<ReturnType<typeof authService.refreshToken>>;
+    try {
+      tokenData = await authService.refreshToken(rawToken);
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        res.clearCookie('refreshToken', {
+          path: '/api/v1/auth',
+          domain: config.cookieDomain,
+        });
+      }
+      throw error;
+    }
+    const { accessToken, newRawRefreshToken, user } = tokenData;
 
     res.cookie('refreshToken', newRawRefreshToken, {
       httpOnly: true,
@@ -58,7 +85,7 @@ export class AuthController {
 
     res.json({
       success: true,
-      data: { accessToken, expiresIn: 900 },
+      data: { accessToken, expiresIn: 900, user },
       meta: { timestamp: new Date().toISOString() },
     });
   }

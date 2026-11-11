@@ -3,6 +3,7 @@ import { OutfitDto, OutfitItemDto } from '@closetiq/shared-types';
 import { computeOutfitScore, ScoredCandidateItem } from './scoringEngine.js';
 import { AIFactory } from '../ai/ai.factory.js';
 import { randomUUID } from 'crypto';
+import { catalogVerificationCutoff } from '../catalog/productVerification.js';
 
 interface CompleteMyOutfitParams {
   userId: string;
@@ -73,6 +74,9 @@ export async function executeCompleteMyOutfit(params: CompleteMyOutfitParams): P
       where: {
         category: { in: neededSlots },
         inStock: true,
+        verificationStatus: { in: ['MANUALLY_VERIFIED', 'LIVE_VERIFIED'] },
+        verifiedAt: { gte: catalogVerificationCutoff() },
+        merchant: { isActive: true },
       },
       take: 20,
     });

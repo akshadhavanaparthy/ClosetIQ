@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.wardrobeService = exports.WardrobeService = void 0;
 const database_1 = require("@closetiq/database");
-const mlClient_service_js_1 = require("./mlClient.service.js");
 const errors_js_1 = require("../utils/errors.js");
 class WardrobeService {
     async getItems(userId, query) {
@@ -67,8 +66,6 @@ class WardrobeService {
         return { items, total };
     }
     async createItem(userId, dto) {
-        // Optionally trigger CV detection metadata if needed
-        const detection = await mlClient_service_js_1.mlClient.detectGarmentAttributes(dto.imageKey);
         const item = await database_1.prisma.wardrobeItem.create({
             data: {
                 userId,
@@ -86,7 +83,7 @@ class WardrobeService {
                 fitType: dto.fitType || null,
                 brand: dto.brand || null,
                 cost: dto.cost !== undefined && dto.cost !== null ? new database_1.Prisma.Decimal(dto.cost) : null,
-                detectionConfidence: detection,
+                detectionConfidence: database_1.Prisma.DbNull,
             },
         });
         return {

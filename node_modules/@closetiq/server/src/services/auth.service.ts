@@ -10,7 +10,7 @@ function hashToken(token: string): string {
 }
 
 export class AuthService {
-  async register(dto: RegisterRequestDto): Promise<AuthResponseDto> {
+  async register(dto: RegisterRequestDto): Promise<{ authResponse: AuthResponseDto; rawRefreshToken: string }> {
     const existing = await prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
     });
@@ -41,6 +41,17 @@ export class AuthService {
       role: user.role,
     });
 
+    const rawRefreshToken = signRefreshToken(user.id);
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashToken(rawRefreshToken),
+        expiresAt,
+      },
+    });
+
     // Record audit log
     await prisma.auditLog.create({
       data: {
@@ -51,16 +62,19 @@ export class AuthService {
     });
 
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        isVerified: user.isVerified,
+      authResponse: {
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          isVerified: user.isVerified,
+        },
+        tokens: {
+          accessToken,
+          expiresIn: 900,
+        },
       },
-      tokens: {
-        accessToken,
-        expiresIn: 900,
-      },
+      rawRefreshToken,
     };
   }
 
@@ -115,13 +129,17 @@ export class AuthService {
     };
   }
 
-  async refreshToken(rawToken: string): Promise<{ accessToken: string; newRawRefreshToken: string }> {
+  async refreshToken(rawToken: string): Promise<{
+    accessToken: string;
+    newRawRefreshToken: string;
+    user: { id: string; email: string; role: Role; fullName: string | null };
+  }> {
     const { userId } = verifyRefreshToken(rawToken);
     const tokenHash = hashToken(rawToken);
 
     const existingToken = await prisma.refreshToken.findUnique({
       where: { tokenHash },
-      include: { user: true },
+      include: { user: { include: { profile: true } } },
     });
 
     // Token reuse detection! If already revoked or not found, invalidate ALL refresh tokens for user
@@ -160,7 +178,16 @@ export class AuthService {
       },
     });
 
-    return { accessToken, newRawRefreshToken };
+    return {
+      accessToken,
+      newRawRefreshToken,
+      user: {
+        id: existingToken.user.id,
+        email: existingToken.user.email,
+        role: existingToken.user.role,
+        fullName: existingToken.user.profile?.fullName ?? null,
+      },
+    };
   }
 
   async logout(rawToken?: string): Promise<void> {

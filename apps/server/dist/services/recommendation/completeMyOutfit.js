@@ -5,6 +5,7 @@ const database_1 = require("@closetiq/database");
 const scoringEngine_js_1 = require("./scoringEngine.js");
 const ai_factory_js_1 = require("../ai/ai.factory.js");
 const crypto_1 = require("crypto");
+const productVerification_js_1 = require("../catalog/productVerification.js");
 async function executeCompleteMyOutfit(params) {
     const { userId, seedItemId, occasion = 'Everyday Elevated', includeShoppingCatalog = true, maxBudget } = params;
     // 1. Fetch User Profile
@@ -45,6 +46,9 @@ async function executeCompleteMyOutfit(params) {
             where: {
                 category: { in: neededSlots },
                 inStock: true,
+                verificationStatus: { in: ['MANUALLY_VERIFIED', 'LIVE_VERIFIED'] },
+                verifiedAt: { gte: (0, productVerification_js_1.catalogVerificationCutoff)() },
+                merchant: { isActive: true },
             },
             take: 20,
         });
