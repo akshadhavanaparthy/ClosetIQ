@@ -7,6 +7,7 @@ const validateRequest_js_1 = require("../middleware/validateRequest.js");
 const shared_types_1 = require("@closetiq/shared-types");
 const router = (0, express_1.Router)();
 router.use(authenticate_js_1.authenticate);
+router.post('/upload', (req, res, next) => analysis_controller_js_1.analysisController.uploadPhoto(req, res).catch(next));
 router.post('/upload-ticket', (req, res, next) => analysis_controller_js_1.analysisController.getUploadTicket(req, res).catch(next));
 router.post('/process-body', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.ProcessBodyAnalysisSchema }), (req, res, next) => analysis_controller_js_1.analysisController.processBody(req, res).catch(next));
 router.post('/process-portrait', (0, validateRequest_js_1.validateRequest)({ body: shared_types_1.ProcessPortraitAnalysisSchema }), (req, res, next) => analysis_controller_js_1.analysisController.processPortrait(req, res).catch(next));

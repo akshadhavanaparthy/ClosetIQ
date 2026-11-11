@@ -17,6 +17,9 @@ class ProfileService {
             fullName: profile.fullName,
             genderPreference: profile.genderPreference,
             heightCm: profile.heightCm,
+            bustChestCm: profile.bustChestCm,
+            waistCm: profile.waistCm,
+            hipCm: profile.hipCm,
             budgetTier: profile.budgetTier,
             bodyShapeEstimated: profile.bodyShapeEstimated,
             bodyShapeConfirmed: profile.bodyShapeConfirmed,
@@ -26,6 +29,8 @@ class ProfileService {
             styleKeywords: profile.styleKeywords,
             avoidColors: profile.avoidColors,
             preferredBrands: profile.preferredBrands,
+            preferredCategories: profile.preferredCategories,
+            preferredOccasions: profile.preferredOccasions,
             sizeTop: profile.sizeTop,
             sizeBottom: profile.sizeBottom,
             sizeShoes: profile.sizeShoes,
@@ -34,14 +39,48 @@ class ProfileService {
         };
     }
     async updateProfile(userId, dto) {
+        // If user provided measurements and bodyShapeEstimated is unspecified, compute it deterministically
+        let calculatedShape = undefined;
+        if (dto.bustChestCm && dto.waistCm && dto.hipCm && dto.bustChestCm > 0 && dto.hipCm > 0) {
+            const b = dto.bustChestCm;
+            const w = dto.waistCm;
+            const h = dto.hipCm;
+            const wToB = w / b;
+            const wToH = w / h;
+            if (wToB <= 0.75 && wToH <= 0.75) {
+                if (Math.abs(b - h) / b <= 0.05) {
+                    calculatedShape = 'HOURGLASS';
+                }
+                else if (h > b * 1.05) {
+                    calculatedShape = 'PEAR';
+                }
+                else {
+                    calculatedShape = 'INVERTED_TRIANGLE';
+                }
+            }
+            else if (b > h * 1.05) {
+                calculatedShape = 'INVERTED_TRIANGLE';
+            }
+            else if (h > b * 1.05) {
+                calculatedShape = 'PEAR';
+            }
+            else if (wToH >= 0.85 && wToB >= 0.85) {
+                calculatedShape = 'RECTANGLE';
+            }
+            else {
+                calculatedShape = 'APPLE';
+            }
+        }
+        const updateData = { ...dto };
+        if (calculatedShape && !dto.bodyShapeConfirmed) {
+            updateData.bodyShapeEstimated = calculatedShape;
+        }
         const profile = await database_1.prisma.profile.upsert({
             where: { userId },
-            update: {
-                ...dto,
-            },
+            update: updateData,
             create: {
                 userId,
-                ...dto,
+                ...updateData,
             },
         });
         return {
@@ -50,6 +89,9 @@ class ProfileService {
             fullName: profile.fullName,
             genderPreference: profile.genderPreference,
             heightCm: profile.heightCm,
+            bustChestCm: profile.bustChestCm,
+            waistCm: profile.waistCm,
+            hipCm: profile.hipCm,
             budgetTier: profile.budgetTier,
             bodyShapeEstimated: profile.bodyShapeEstimated,
             bodyShapeConfirmed: profile.bodyShapeConfirmed,
@@ -59,6 +101,8 @@ class ProfileService {
             styleKeywords: profile.styleKeywords,
             avoidColors: profile.avoidColors,
             preferredBrands: profile.preferredBrands,
+            preferredCategories: profile.preferredCategories,
+            preferredOccasions: profile.preferredOccasions,
             sizeTop: profile.sizeTop,
             sizeBottom: profile.sizeBottom,
             sizeShoes: profile.sizeShoes,

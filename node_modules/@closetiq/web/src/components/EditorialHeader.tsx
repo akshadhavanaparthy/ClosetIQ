@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Plus, Compass, Shirt, Layers, UserCheck } from 'lucide-react';
+import { Sparkles, Compass, Shirt, Layers } from 'lucide-react';
 import { ProfileResponseDto } from '@closetiq/shared-types';
 
 interface EditorialHeaderProps {
@@ -7,8 +7,9 @@ interface EditorialHeaderProps {
   onTabChange: (tab: string) => void;
   profile: ProfileResponseDto | null;
   wardrobeCount: number;
-  onOpenAddModal: () => void;
-  onStartOnboarding: () => void;
+  isAuthenticated: boolean;
+  userName?: string;
+  onOpenAuth: () => void;
 }
 
 export const EditorialHeader: React.FC<EditorialHeaderProps> = ({
@@ -16,108 +17,88 @@ export const EditorialHeader: React.FC<EditorialHeaderProps> = ({
   onTabChange,
   profile,
   wardrobeCount,
-  onOpenAddModal,
-  onStartOnboarding,
+  isAuthenticated,
+  userName,
+  onOpenAuth,
 }) => {
   return (
-    <header className="glass-header py-3 px-6">
-      <div className="container flex items-center justify-between gap-4">
-        {/* Brand Mark */}
-        <div
-          className="flex items-center gap-3"
-          style={{ cursor: 'pointer' }}
+    <header className="site-header">
+      <div className="container header-content">
+        <button
+          type="button"
+          className="brand-home"
           onClick={() => onTabChange('editorial')}
+          aria-label="ClosetIQ home"
         >
           <div className="brand-badge">Q</div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-serif text-2xl font-medium text-obsidian" style={{ letterSpacing: '-0.02em' }}>
+              <span className="font-serif text-2xl font-medium text-obsidian brand-name">
                 ClosetIQ
               </span>
-              <span className="badge-formality" style={{ fontSize: '0.62rem', padding: '0.15rem 0.5rem' }}>
-                Determinism
-              </span>
             </div>
-            <p className="text-xs text-muted font-sans uppercase" style={{ letterSpacing: '0.12em', fontSize: '0.65rem' }}>
-              Editorial Fashion Intelligence
+            <p className="brand-caption">
+              Wardrobe and outfit planning
             </p>
           </div>
-        </div>
+        </button>
 
-        {/* Navigation Pills */}
-        <nav className="nav-pills">
+        <nav className="nav-pills" aria-label="Primary navigation">
           <button
+            type="button"
             onClick={() => onTabChange('editorial')}
             className={`pill-tab ${currentTab === 'editorial' ? 'active' : ''}`}
+            aria-current={currentTab === 'editorial' ? 'page' : undefined}
           >
-            Editorial
+            Overview
           </button>
           <button
+            type="button"
             onClick={() => onTabChange('wardrobe')}
             className={`pill-tab ${currentTab === 'wardrobe' ? 'active' : ''}`}
+            aria-current={currentTab === 'wardrobe' ? 'page' : undefined}
           >
             <Shirt style={{ width: '0.875rem', height: '0.875rem' }} />
             <span>Wardrobe</span>
             <span className="tab-badge">{wardrobeCount}</span>
           </button>
           <button
+            type="button"
             onClick={() => onTabChange('builder')}
             className={`pill-tab ${currentTab === 'builder' ? 'active' : ''}`}
+            aria-current={currentTab === 'builder' ? 'page' : undefined}
           >
             <Layers style={{ width: '0.875rem', height: '0.875rem' }} />
             <span>Outfit Builder</span>
           </button>
           <button
+            type="button"
             onClick={() => onTabChange('analysis')}
             className={`pill-tab ${currentTab === 'analysis' ? 'active' : ''}`}
+            aria-current={currentTab === 'analysis' ? 'page' : undefined}
           >
             <Sparkles style={{ width: '0.875rem', height: '0.875rem' }} />
-            <span>Analysis Lab</span>
+            <span>Style Analysis</span>
           </button>
           <button
+            type="button"
             onClick={() => onTabChange('discovery')}
             className={`pill-tab ${currentTab === 'discovery' ? 'active' : ''}`}
+            aria-current={currentTab === 'discovery' ? 'page' : undefined}
           >
             <Compass style={{ width: '0.875rem', height: '0.875rem' }} />
             <span>Discovery</span>
           </button>
         </nav>
 
-        {/* Action Controls & User Profile Badge */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onOpenAddModal}
-            className="btn-primary"
-            style={{ fontSize: '0.78rem', padding: '0.5rem 1.1rem' }}
-          >
-            <Plus style={{ width: '0.875rem', height: '0.875rem' }} />
-            <span>Add Garment</span>
-          </button>
-
-          <button
-            onClick={onStartOnboarding}
-            className="flex items-center gap-2 p-2 rounded-full border-stone bg-linen-pure"
-            style={{ border: '1px solid var(--border-stone)', cursor: 'pointer', paddingRight: '1rem' }}
-          >
-            <div
-              className="rounded-full flex items-center justify-center text-olive"
-              style={{
-                width: '1.75rem',
-                height: '1.75rem',
-                backgroundColor: 'var(--accent-olive-light)',
-              }}
-            >
-              <UserCheck style={{ width: '0.9rem', height: '0.9rem' }} />
-            </div>
-            <div style={{ textAlign: 'left' }}>
-              <p className="text-xs font-medium text-obsidian" style={{ lineHeight: '1.1' }}>
-                {profile?.fullName || 'Style Profile'}
-              </p>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>
-                {profile?.seasonalPalette ? profile.seasonalPalette.replace('_', ' ') : 'Assessment'}
-              </p>
-            </div>
-          </button>
+        <div className="header-account" aria-live="polite">
+          {isAuthenticated ? (
+            <span>{profile?.fullName || userName || 'Personal studio'}</span>
+          ) : (
+            <button type="button" className="header-auth-action" onClick={onOpenAuth}>
+              Sign in
+            </button>
+          )}
         </div>
       </div>
     </header>

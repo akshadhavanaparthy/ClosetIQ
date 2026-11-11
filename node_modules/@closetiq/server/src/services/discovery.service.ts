@@ -102,7 +102,7 @@ export class DiscoveryService {
       inStock: p.inStock,
       productUrl: p.productUrl,
       affiliateUrl: p.affiliateUrl,
-      imageUrls: p.imageUrls,
+      imageUrls: [],
       lastPriceVerified: p.lastPriceVerified ? p.lastPriceVerified.toISOString() : null,
       createdAt: p.createdAt.toISOString(),
       updatedAt: p.updatedAt.toISOString(),
@@ -152,7 +152,7 @@ export class DiscoveryService {
       inStock: p.inStock,
       productUrl: p.productUrl,
       affiliateUrl: p.affiliateUrl,
-      imageUrls: p.imageUrls,
+      imageUrls: [],
       createdAt: p.createdAt.toISOString(),
       updatedAt: p.updatedAt.toISOString(),
     };
@@ -186,7 +186,7 @@ export class DiscoveryService {
       inStock: w.product.inStock,
       productUrl: w.product.productUrl,
       affiliateUrl: w.product.affiliateUrl,
-      imageUrls: w.product.imageUrls,
+      imageUrls: [],
       createdAt: w.createdAt.toISOString(),
       updatedAt: w.product.updatedAt.toISOString(),
     }));

@@ -17,6 +17,14 @@ class DiscoveryController {
             },
         });
     }
+    async getBrands(_req, res) {
+        const brands = await discovery_service_js_1.discoveryService.getBrands();
+        res.json({
+            success: true,
+            data: brands,
+            meta: { timestamp: new Date().toISOString() },
+        });
+    }
     async getById(req, res) {
         const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
         const product = await discovery_service_js_1.discoveryService.getProductById(id);

@@ -197,8 +197,10 @@ async function executeCompleteMyOutfit(params) {
                 subCategory: item.subCategory,
                 primaryColorHex: item.primaryColorHex,
                 primaryColorName: item.primaryColorName,
-                imageUrl: productMatch?.imageUrls[0] ||
-                    'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=800&q=80',
+                imageUrl: isOwned && ownedMatch &&
+                    (ownedMatch.imageKey.startsWith('/uploads/') || ownedMatch.imageKey.startsWith('uploads/'))
+                    ? ownedMatch.imageKey
+                    : '',
                 price: item.price,
                 affiliateUrl: productMatch?.affiliateUrl || null,
             };

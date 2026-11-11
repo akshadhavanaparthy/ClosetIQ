@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ProductDto } from '@closetiq/shared-types';
-import { X, Heart, ShoppingBag, ExternalLink, Sparkles, ShieldCheck, Truck } from 'lucide-react';
+import { X, Heart, ShoppingBag, ExternalLink, Sparkles, ShieldCheck, Truck, Shirt } from 'lucide-react';
 
 interface ProductDetailModalProps {
   product: ProductDto | null;
@@ -45,27 +45,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       >
         <button
           onClick={onClose}
-          className="rounded-full p-2 text-muted"
+          className="rounded-lg p-2 text-muted"
           style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', border: 'none', background: 'transparent', cursor: 'pointer', zIndex: 10 }}
         >
           <X style={{ width: '1.25rem', height: '1.25rem' }} />
         </button>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Product Photography */}
           <div className="space-y-3">
             <div
-              className="aspect-garment rounded-2xl overflow-hidden"
+              className="aspect-garment product-placeholder rounded-lg overflow-hidden"
               style={{ border: '1px solid var(--border-stone)' }}
             >
-              <img
-                src={product.imageUrls[0]}
-                alt={product.title}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
+              <Shirt aria-hidden="true" />
               <div style={{ position: 'absolute', top: '0.75rem', left: '0.75rem' }}>
                 <span className="badge-formality" style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}>
-                  {product.merchantName || 'LUXURY ATELIER'}
+                  {product.merchantName || 'Merchant not provided'}
                 </span>
               </div>
             </div>
@@ -181,7 +176,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => onToggleWishlist(product.id)}
-                  className={`p-3 rounded-full border transition flex items-center justify-center ${
+                  className={`p-3 rounded-lg border transition flex items-center justify-center ${
                     isWishlisted ? 'bg-terracotta text-white border-terracotta' : 'bg-linen-pure text-muted border-stone'
                   }`}
                   style={{ width: '3rem', height: '3rem', cursor: 'pointer' }}
@@ -236,8 +231,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   onClick={() => onSelectProduct(comp)}
                   className="editorial-card p-3 flex items-center gap-3 cursor-pointer"
                 >
-                  <div className="w-16 h-20 rounded-lg overflow-hidden bg-linen-warm flex-shrink-0">
-                    <img src={comp.imageUrls[0]} alt={comp.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div className="w-16 h-20 rounded-lg overflow-hidden bg-linen-warm flex-shrink-0 image-placeholder" aria-hidden="true">
+                    <Shirt />
                   </div>
                   <div className="truncate">
                     <p className="editorial-caps text-muted" style={{ fontSize: '0.58rem' }}>{comp.brand}</p>

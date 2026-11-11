@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ValidationError = exports.ConflictError = exports.ForbiddenError = exports.UnauthorizedError = exports.NotFoundError = exports.AppError = void 0;
+exports.ServiceUnavailableError = exports.ValidationError = exports.ConflictError = exports.ForbiddenError = exports.UnauthorizedError = exports.NotFoundError = exports.AppError = void 0;
 class AppError extends Error {
     statusCode;
     code;
@@ -44,3 +44,9 @@ class ValidationError extends AppError {
     }
 }
 exports.ValidationError = ValidationError;
+class ServiceUnavailableError extends AppError {
+    constructor(message = 'Service temporarily unavailable', details) {
+        super(message, 503, 'SERVICE_UNAVAILABLE', details);
+    }
+}
+exports.ServiceUnavailableError = ServiceUnavailableError;

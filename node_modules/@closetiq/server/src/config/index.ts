@@ -15,5 +15,4 @@ export const config = {
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   geminiApiKey: process.env.GEMINI_API_KEY || '',
-  cdnBaseUrl: process.env.VITE_IMAGE_CDN_URL || 'https://images.unsplash.com',
 };

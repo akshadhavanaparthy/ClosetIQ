@@ -6,10 +6,6 @@ import {
   Check,
   ArrowRight,
   ArrowLeft,
-  Upload,
-  Trash2,
-  RefreshCw,
-  ShieldCheck,
   AlertCircle,
   HelpCircle,
 } from 'lucide-react';
@@ -67,15 +63,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     currentProfile?.preferredBrands || []
   );
 
-  // Photo Upload & Consent State
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [photoConsent, setPhotoConsent] = useState<boolean>(false);
-  const [uploading, setUploading] = useState<boolean>(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadSuccess, setUploadSuccess] = useState<boolean>(false);
-  const [_uploadedStorageKey, setUploadedStorageKey] = useState<string | null>(null);
-
+  const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   if (!isOpen) return null;
@@ -88,89 +76,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     }
   };
 
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      setUploadError('Please select a valid image file (JPEG, PNG, or WebP).');
-      return;
-    }
-
-    if (file.size > 8 * 1024 * 1024) {
-      setUploadError('Photograph exceeds the 8MB limit. Please choose a smaller image.');
-      return;
-    }
-
-    setUploadError(null);
-    setPhotoFile(file);
-    const objectUrl = URL.createObjectURL(file);
-    setPhotoPreview(objectUrl);
-    setUploadSuccess(false);
-  };
-
-  const handleRemovePhoto = () => {
-    if (photoPreview && photoPreview.startsWith('blob:')) {
-      URL.revokeObjectURL(photoPreview);
-    }
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    setUploadSuccess(false);
-    setUploadedStorageKey(null);
-    setUploadError(null);
-  };
-
-  const handleUploadAndAnalyzePhoto = async (): Promise<string | null> => {
-    if (!photoFile) return null;
-    if (!photoConsent) {
-      setUploadError('Please provide consent for colorimetric analysis before uploading.');
-      return null;
-    }
-
-    setUploading(true);
-    setUploadError(null);
-
-    try {
-      // Read as Base64 data URL
-      const base64Data = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(photoFile);
-      });
-
-      const uploaded = await api.uploadPhoto(base64Data, photoFile.name, 'PORTRAIT');
-      setUploadedStorageKey(uploaded.storageKey);
-      setUploadSuccess(true);
-
-      // Trigger actual ML undertone analysis
-      try {
-        await api.processPortrait(uploaded.storageKey);
-      } catch (mlErr: any) {
-        console.warn('ML analysis warning:', mlErr);
-        // Photo saved, but notify user honestly if ML service was offline
-      }
-
-      return uploaded.storageKey;
-    } catch (err: any) {
-      setUploadError(err?.message || 'Failed to upload photo. Please try again.');
-      return null;
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const handleSaveAndContinue = async () => {
-    // If on photo step and photo selected but not uploaded yet, upload first
-    if (step === 5 && photoFile && !uploadSuccess) {
-      if (!photoConsent) {
-        setUploadError('Please check the consent box to process your photo, or click "Skip Photo Upload".');
-        return;
-      }
-      const key = await handleUploadAndAnalyzePhoto();
-      if (!key) return; // Wait for successful upload
-    }
-
     if (step < totalSteps) {
       setStep(step + 1);
     } else {
@@ -201,7 +107,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
         onClose();
       } catch (err: any) {
         console.error('Failed to save profile:', err);
-        setUploadError(err?.message || 'Failed to save profile.');
+        setFormError(err?.message || 'Failed to save profile.');
       } finally {
         setSaving(false);
       }
@@ -215,7 +121,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       <div className="modal-content p-8" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '44rem' }}>
         <button
           onClick={onClose}
-          className="rounded-full p-2 text-muted"
+          className="rounded-lg p-2 text-muted"
           style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', border: 'none', background: 'transparent', cursor: 'pointer' }}
           title="Close onboarding"
         >
@@ -226,7 +132,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
         <div className="mb-6">
           <div className="flex justify-between items-center text-xs text-muted mb-2">
             <span className="editorial-caps text-terracotta">
-              Step {step} of {totalSteps}: Personal Style Dossier
+            Step {step} of {totalSteps}: Profile setup
             </span>
             <span className="font-mono font-semibold">{calculateProgress()}% Complete</span>
           </div>
@@ -297,11 +203,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               </div>
 
               {/* Unit Toggle */}
-              <div className="flex items-center border border-stone rounded-full p-1 bg-linen-warm text-xs">
+              <div className="flex items-center border border-stone rounded-lg p-1 bg-linen-warm text-xs">
                 <button
                   type="button"
                   onClick={() => setUnit('cm')}
-                  className={`px-3 py-1 rounded-full font-mono transition ${unit === 'cm' ? 'bg-obsidian text-white' : 'text-muted'}`}
+                  className={`px-3 py-1 rounded-lg font-mono transition ${unit === 'cm' ? 'bg-obsidian text-white' : 'text-muted'}`}
                   style={{ border: 'none', cursor: 'pointer' }}
                 >
                   Centimeters (cm)
@@ -309,7 +215,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setUnit('inches')}
-                  className={`px-3 py-1 rounded-full font-mono transition ${unit === 'inches' ? 'bg-obsidian text-white' : 'text-muted'}`}
+                  className={`px-3 py-1 rounded-lg font-mono transition ${unit === 'inches' ? 'bg-obsidian text-white' : 'text-muted'}`}
                   style={{ border: 'none', cursor: 'pointer' }}
                 >
                   Inches (in)
@@ -622,154 +528,47 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           </div>
         )}
 
-        {/* STEP 5: Skin-Tone & Color Analysis Photograph Upload */}
+        {/* STEP 5: Portrait Analysis */}
         {step === 5 && (
           <div className="space-y-6 animate-fade-in">
             <div>
-              <span className="editorial-caps text-terracotta">Chromatic Colorimetry</span>
+              <span className="editorial-caps text-terracotta">Portrait analysis</span>
               <h2 className="font-serif text-3xl font-medium text-obsidian mt-1">
-                Skin-Tone & Color Analysis Photograph
+                Portrait analysis setup
               </h2>
               <p className="text-xs text-muted mt-1 leading-relaxed">
-                Upload a well-lit portrait photograph of yourself to evaluate your undertone and seasonal color palette.
+                [TODO: verify the portrait-analysis service and document its results before enabling photo upload.]
               </p>
             </div>
 
-            {/* Purpose & Privacy Explanation */}
-            <div className="p-4 rounded-2xl bg-linen-warm border border-stone space-y-2 text-xs text-muted">
-              <div className="flex items-center gap-2 text-obsidian font-medium">
-                <ShieldCheck style={{ width: '1.1rem', height: '1.1rem', color: 'var(--accent-olive)' }} />
-                <span>Why We Need This Photograph & How It Is Protected</span>
-              </div>
+            <div className="p-4 rounded-xl bg-linen-warm border border-stone space-y-2 text-xs text-muted">
+              <p className="font-medium text-obsidian">Portrait processing details</p>
               <p className="leading-relaxed">
-                ClosetIQ uses mathematical <strong>CIELAB colorimetry</strong> on forehead and cheek skin patches to objectively compute your <strong>Individual Typology Angle (ITA)</strong> and undertone (Cool, Warm, Neutral, Olive).
+                [TODO: describe the analysis performed by the connected service and the results it returns.]
               </p>
               <p className="leading-relaxed">
-                Your photograph is encrypted, stored strictly within your private account atelier, and is never published or shared with third parties.
+                [TODO: explain where portraits are sent or stored, how they are protected, and when they are deleted.]
               </p>
             </div>
 
-            {/* Consent Toggle */}
-            <div
-              onClick={() => setPhotoConsent(!photoConsent)}
-              className="p-3.5 rounded-xl border flex items-center gap-3 cursor-pointer transition"
-              style={{
-                backgroundColor: photoConsent ? 'var(--accent-olive-light)' : 'var(--bg-linen-pure)',
-                borderColor: photoConsent ? 'var(--accent-olive)' : 'var(--border-stone)',
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={photoConsent}
-                onChange={(e) => setPhotoConsent(e.target.checked)}
-                style={{ cursor: 'pointer', width: '1.1rem', height: '1.1rem' }}
-              />
-              <span className="text-xs text-obsidian font-medium leading-tight">
-                I understand why this photograph is needed and give my consent for automated colorimetric analysis.
-              </span>
+            <div className="p-3.5 rounded-lg border bg-linen-pure text-xs text-muted" role="note">
+              [TODO: add informed-consent text after portrait processing and retention details are confirmed.]
             </div>
 
-            {/* Photo Selection / Preview Area */}
-            {!photoPreview ? (
-              <label
-                className="border-2 border-dashed border-stone rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition hover:border-obsidian bg-linen-warm"
-                style={{ minHeight: '13rem' }}
-              >
-                <Upload className="mx-auto mb-2 text-muted" style={{ width: '2rem', height: '2rem' }} />
-                <p className="font-serif text-lg text-obsidian font-medium">Choose a Photograph from Your Device</p>
-                <p className="text-xs text-muted mt-1">JPEG, PNG, or WebP up to 8MB. Even natural lighting recommended.</p>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhotoSelect}
-                  style={{ display: 'none' }}
-                />
-              </label>
-            ) : (
-              <div className="editorial-card p-5 space-y-4">
-                <div className="flex items-start gap-4">
-                  <div
-                    className="rounded-2xl overflow-hidden border border-stone bg-black"
-                    style={{ width: '7rem', height: '7rem', flexShrink: 0 }}
-                  >
-                    <img
-                      src={photoPreview}
-                      alt="Uploaded preview"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  </div>
+            <div className="border-2 border-dashed border-stone rounded-xl p-8 flex flex-col items-center justify-center text-center bg-linen-warm">
+              <p className="font-serif text-lg text-obsidian font-medium">Photo upload unavailable</p>
+              <p className="text-xs text-muted mt-1">[TODO: enable after portrait analysis and data handling are verified.]</p>
+            </div>
 
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium text-obsidian">{photoFile?.name || 'Uploaded Portrait'}</p>
-                    <p className="text-xs text-muted font-mono">
-                      {photoFile ? `${Math.round(photoFile.size / 1024)} KB` : ''}
-                    </p>
-                    {uploadSuccess ? (
-                      <span className="badge-formality badge-olive inline-flex items-center gap-1 mt-1">
-                        <Check style={{ width: '0.75rem', height: '0.75rem' }} /> Uploaded & Ready
-                      </span>
-                    ) : (
-                      <span className="text-xs text-terracotta inline-block mt-1">
-                        Ready for colorimetric assessment
-                      </span>
-                    )}
-
-                    <div className="flex items-center gap-3 pt-3">
-                      <label className="text-xs text-obsidian underline cursor-pointer flex items-center gap-1">
-                        <RefreshCw style={{ width: '0.8rem', height: '0.8rem' }} /> Replace Photo
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handlePhotoSelect}
-                          style={{ display: 'none' }}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleRemovePhoto}
-                        className="text-xs text-terracotta underline flex items-center gap-1"
-                        style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}
-                      >
-                        <Trash2 style={{ width: '0.8rem', height: '0.8rem' }} /> Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {uploading && (
-                  <div className="space-y-1.5 pt-2">
-                    <div className="flex justify-between text-xs text-muted">
-                      <span>Analyzing skin undertone & CIELAB color space...</span>
-                      <RefreshCw style={{ width: '0.9rem', height: '0.9rem', animation: 'spin 1.5s linear infinite' }} />
-                    </div>
-                    <div className="progress-bar-bg" style={{ height: '0.35rem' }}>
-                      <div className="progress-bar-fill" style={{ width: '75%', backgroundColor: 'var(--accent-terracotta)' }} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {uploadError && (
-              <div className="p-3 rounded-xl bg-linen-warm border border-terracotta text-terracotta text-xs flex items-center gap-2">
+            {formError && (
+              <div className="p-3 rounded-lg bg-linen-warm border border-terracotta text-terracotta text-xs flex items-center gap-2" role="alert">
                 <AlertCircle style={{ width: '1rem', height: '1rem', flexShrink: 0 }} />
-                <span>{uploadError}</span>
+                <span>{formError}</span>
               </div>
             )}
 
             <div className="flex items-center justify-between text-xs text-muted pt-2">
-              <span>Photo upload is optional. If skipped, undertone analysis remains incomplete.</span>
-              <button
-                type="button"
-                onClick={() => {
-                  handleRemovePhoto();
-                  setStep(6);
-                }}
-                className="text-xs text-terracotta underline font-medium"
-                style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}
-              >
-                Skip Photo Upload →
-              </button>
+              <span>Portrait upload is unavailable until processing details are verified.</span>
             </div>
           </div>
         )}
@@ -778,12 +577,12 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
         {step === 6 && (
           <div className="space-y-6 animate-fade-in">
             <div>
-              <span className="editorial-caps text-terracotta">Dossier Summary</span>
+              <span className="editorial-caps text-terracotta">Profile summary</span>
               <h2 className="font-serif text-3xl font-medium text-obsidian mt-1">
                 Review Your Personal Profile
               </h2>
               <p className="text-xs text-muted mt-1 leading-relaxed">
-                Confirm your details before activating your personalized editorial shopping studio.
+                Review your details before saving your profile.
               </p>
             </div>
 
@@ -803,15 +602,13 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
               <div className="editorial-card p-4 space-y-2">
                 <span className="editorial-caps text-muted" style={{ fontSize: '0.62rem' }}>
-                  Colorimetry & Photography
+                  Portrait analysis
                 </span>
                 <p className="font-serif text-xl text-obsidian font-medium">
-                  {photoFile ? 'Photograph Uploaded' : 'Photo Skipped'}
+                  Not configured
                 </p>
                 <p className="text-xs text-muted leading-relaxed">
-                  {photoFile
-                    ? 'Your portrait is saved in your private atelier and verified for CIELAB colorimetry.'
-                    : 'No portrait uploaded. Undertone and palette will remain incomplete until calibrated.'}
+                  [TODO: connect portrait analysis and document its data handling before launch.]
                 </p>
               </div>
             </div>
@@ -839,7 +636,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             </div>
 
             <div className="p-4 rounded-xl bg-linen-warm text-xs text-muted leading-relaxed">
-              <strong>Authentic Calibration:</strong> Your dashboard will only display real analysis results or your exact measurements. You can adjust your profile anytime.
+              Your dashboard displays saved profile details and analysis results returned by the connected service.
             </div>
           </div>
         )}
@@ -850,7 +647,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             <button
               type="button"
               onClick={() => {
-                setUploadError(null);
+                setFormError(null);
                 setStep(step - 1);
               }}
               className="btn-secondary"
@@ -865,10 +662,10 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           <button
             type="button"
             onClick={handleSaveAndContinue}
-            disabled={saving || uploading}
+            disabled={saving}
             className="btn-primary"
           >
-            <span>{saving ? 'Activating Studio...' : uploading ? 'Analyzing...' : step === totalSteps ? 'Complete & Enter Studio' : 'Save & Continue'}</span>
+            <span>{saving ? 'Saving...' : step === totalSteps ? 'Save profile' : 'Save & Continue'}</span>
             <ArrowRight style={{ width: '0.85rem', height: '0.85rem' }} />
           </button>
         </div>

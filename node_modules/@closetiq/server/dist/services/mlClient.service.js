@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.mlClient = exports.MLClientService = void 0;
 const index_js_1 = require("../config/index.js");
 const logger_js_1 = require("../utils/logger.js");
+const errors_js_1 = require("../utils/errors.js");
 class MLClientService {
     baseUrl;
     apiKey;
@@ -23,18 +24,12 @@ class MLClientService {
             if (response.ok) {
                 return (await response.json());
             }
+            throw new Error(`ML service returned status ${response.status}`);
         }
         catch (err) {
-            logger_js_1.logger.warn('ML Service unreachable, using deterministic anatomical fallback:', err);
+            logger_js_1.logger.error('ML Body Shape Analysis failed or service unreachable:', err);
+            throw new errors_js_1.ServiceUnavailableError('AI Body Shape model service is currently offline or unreachable. Please verify ML service status.');
         }
-        // Deterministic fallback based on baseline geometric ratios
-        return {
-            shoulderHipRatio: 1.02,
-            waistHipRatio: 0.72,
-            torsoLegRatio: 0.85,
-            detectedBodyShape: 'HOURGLASS',
-            confidenceScore: 0.94,
-        };
     }
     async analyzeSkinUndertone(imageKey) {
         try {
@@ -49,20 +44,12 @@ class MLClientService {
             if (response.ok) {
                 return (await response.json());
             }
+            throw new Error(`ML service returned status ${response.status}`);
         }
         catch (err) {
-            logger_js_1.logger.warn('ML Service unreachable, using CIELAB colorimetric fallback:', err);
+            logger_js_1.logger.error('ML Skin Undertone Analysis failed or service unreachable:', err);
+            throw new errors_js_1.ServiceUnavailableError('AI Skin Tone & Palette model service is currently offline or unreachable. Please verify ML service status.');
         }
-        // Deterministic fallback (Cool undertone, True Winter)
-        return {
-            skinLabL: 64.2,
-            skinLabA: 11.4,
-            skinLabB: 12.8,
-            itaAngle: 47.9,
-            detectedUndertone: 'COOL',
-            detectedPalette: 'TRUE_WINTER',
-            confidenceScore: 0.96,
-        };
     }
     async detectGarmentAttributes(imageKey) {
         try {

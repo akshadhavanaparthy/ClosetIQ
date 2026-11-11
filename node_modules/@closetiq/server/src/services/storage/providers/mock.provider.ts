@@ -9,7 +9,7 @@ export class MockStorageProvider implements IStorageService {
     return {
       uploadUrl: `https://mock-storage.closetiq.fashion/upload?key=${storageKey}&token=${randomUUID()}`,
       storageKey,
-      publicUrl: `https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=800&q=80`,
+      publicUrl: '',
       expiresInSeconds: 900,
     };
   }

@@ -1,47 +1,57 @@
 import React, { useEffect, useState } from 'react';
+import { AuthModal } from './components/AuthModal';
 import { EditorialHeader } from './components/EditorialHeader';
-import { api } from './services/api';
+import { LegalPage } from './components/LegalPage';
+import { SiteFooter } from './components/SiteFooter';
+import { api, UserSession } from './services/api';
 import {
   ProfileResponseDto,
   WardrobeItemDto,
   OutfitDto,
-  ProductDto,
   BodyAnalysisResponseDto,
 } from '@closetiq/shared-types';
-import { Sparkles, Cpu, Database, Compass, Shirt, Layers, RefreshCw } from 'lucide-react';
+import { Sparkles, Compass, Shirt, Layers, RefreshCw } from 'lucide-react';
+
+const isProvidedImage = (imageUrl?: string | null): imageUrl is string =>
+  Boolean(imageUrl && (imageUrl.startsWith('/uploads/') || imageUrl.startsWith('uploads/')));
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('editorial');
   const [profile, setProfile] = useState<ProfileResponseDto | null>(null);
   const [wardrobe, setWardrobe] = useState<WardrobeItemDto[]>([]);
   const [outfits, setOutfits] = useState<OutfitDto[]>([]);
-  const [catalog, setCatalog] = useState<ProductDto[]>([]);
   const [analysis, setAnalysis] = useState<BodyAnalysisResponseDto | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [backendConnected, setBackendConnected] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [session, setSession] = useState<UserSession | null>(() => api.getCurrentUser());
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const hasActiveSession = Boolean(
+    session &&
+    session.token !== 'mock-jwt-token-2026' &&
+    !session.token.startsWith('demo-token-')
+  );
 
   useEffect(() => {
     async function loadInitialData() {
+      if (!hasActiveSession) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
-        // Probe backend health quietly
-        try {
-          const res = await fetch('/healthz');
-          if (res.ok) setBackendConnected(true);
-        } catch {
-          setBackendConnected(false);
+        const healthResponse = await fetch('/healthz');
+        if (!healthResponse.ok) {
+          throw new Error(`The ClosetIQ service is unavailable (${healthResponse.status}).`);
         }
-
-        const [profData, wardrobeData, catalogData, analysisData] = await Promise.all([
+        const [profData, wardrobeData, analysisData] = await Promise.all([
           api.getProfile(),
           api.getWardrobe(),
-          api.getCatalog(),
           api.getLatestAnalysis(),
         ]);
 
         setProfile(profData);
         setWardrobe(wardrobeData);
-        setCatalog(catalogData);
         setAnalysis(analysisData);
 
         if (wardrobeData.length > 0) {
@@ -54,190 +64,152 @@ export const App: React.FC = () => {
         }
       } catch (err) {
         console.error('ClosetIQ Initialization:', err);
+        setLoadError(err instanceof Error ? err.message : 'Your ClosetIQ data could not be loaded.');
       } finally {
         setLoading(false);
       }
     }
 
     loadInitialData();
-  }, []);
+  }, [hasActiveSession]);
+
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  if (path === '/privacy') return <LegalPage kind="privacy" />;
+  if (path === '/terms') return <LegalPage kind="terms" />;
 
   return (
     <div className="min-h-screen bg-linen text-obsidian">
-      {/* Haute Couture Editorial Header */}
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <EditorialHeader
         currentTab={currentTab}
         onTabChange={(tab) => setCurrentTab(tab)}
         profile={profile}
         wardrobeCount={wardrobe.length}
-        onOpenAddModal={() => alert('Garment Computer Vision ingestion pipeline modal.')}
-        onStartOnboarding={() => alert('Biometric assessment & morphometry onboarding flow.')}
+        isAuthenticated={hasActiveSession}
+        userName={session?.fullName}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
       />
 
-      <main className="container py-8 animate-fade-in">
-        {/* Architecture & Engine Status Bar */}
-        <section
-          className="mb-8 p-4 rounded-2xl bg-linen-pure flex items-center justify-between flex-wrap gap-4"
-          style={{ border: '1px solid var(--border-stone)', boxShadow: 'var(--shadow-sm)' }}
-        >
-          <div className="flex items-center gap-3">
-            <div className={backendConnected ? 'status-dot-active' : 'status-dot-warning'} />
-            <div>
-              <p className="editorial-caps text-muted" style={{ fontSize: '0.62rem' }}>
-                System Architecture Status
-              </p>
-              <p className="text-sm font-medium text-obsidian">
-                {backendConnected
-                  ? 'Core Express Service Online (Port 4000) • Real-Time Deterministic Engine'
-                  : 'Vite Standalone Mode Active • Deterministic Luxury Engine Running Offline Fallbacks'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="badge-formality badge-terracotta">
-              <Cpu style={{ width: '0.85rem', height: '0.85rem' }} />
-              <span>TypeScript Microservices</span>
-            </span>
-            <span className="badge-formality badge-olive">
-              <Database style={{ width: '0.85rem', height: '0.85rem' }} />
-              <span>Prisma v6 Architecture</span>
-            </span>
-            <span className="badge-formality">
-              <Sparkles style={{ width: '0.85rem', height: '0.85rem', color: 'var(--accent-gold)' }} />
-              <span>CIELAB Colorimetry</span>
-            </span>
-          </div>
-        </section>
+      <main id="main-content" className="container py-8">
+        {!hasActiveSession && (
+          <section className="connection-notice" role="status">
+            Sign in to load your wardrobe and personal style details.
+          </section>
+        )}
+        {loadError && (
+          <section className="connection-error" role="alert">
+            {loadError}
+          </section>
+        )}
 
         {loading ? (
           <div className="py-24 text-center">
             <RefreshCw
               className="mx-auto mb-4 text-terracotta"
-              style={{ width: '2.5rem', height: '2.5rem', animation: 'spin 1.5s linear infinite' }}
+              style={{ width: '2rem', height: '2rem' }}
+              aria-hidden="true"
             />
-            <p className="font-serif text-2xl text-muted font-light">
-              Calibrating wardrobe geometry and tonal colorimetry...
-            </p>
+            <p className="font-serif text-2xl text-muted font-light">Loading your wardrobe...</p>
           </div>
         ) : (
           <>
-            {/* 1. EDITORIAL DASHBOARD */}
             {currentTab === 'editorial' && (
               <div className="space-y-12 animate-fade-in">
-                {/* Hero Editorial Dossier */}
-                <section
-                  className="p-8 rounded-3xl bg-linen-warm relative overflow-hidden"
-                  style={{ border: '1px solid var(--border-stone)' }}
-                >
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                    <div style={{ maxWidth: '42rem' }}>
-                      <span className="editorial-caps text-terracotta">Haute Horlogerie of Wardrobe Curation</span>
-                      <h1 className="editorial-title text-5xl font-light text-obsidian mt-2">
-                        ClosetIQ Intelligence Studio
-                      </h1>
-                      <p className="text-base text-muted mt-3 font-normal" style={{ lineHeight: '1.6' }}>
-                        Deterministic mathematical modeling for high-end personal styling. Blending anatomical body
-                        proportions, CIELAB color space harmony, and an exclusive luxury capsule architecture.
-                      </p>
-                      <div className="flex items-center gap-2 mt-4 flex-wrap">
-                        {profile?.styleKeywords?.map((kw, i) => (
-                          <span
-                            key={i}
-                            className="badge-formality"
-                            style={{ backgroundColor: '#FFFFFF', borderColor: 'var(--border-stone)' }}
-                          >
-                            #{kw}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div
-                      className="p-5 rounded-2xl bg-linen-pure text-right"
-                      style={{
-                        border: '1px solid var(--border-stone)',
-                        minWidth: '240px',
-                        boxShadow: 'var(--shadow-sm)',
-                      }}
+                <section className="hero-panel">
+                  <div className="hero-copy">
+                    <span className="editorial-caps text-terracotta">ClosetIQ wardrobe studio</span>
+                    <h1 className="editorial-title hero-title">Plan outfits from the clothes you own.</h1>
+                    <p className="hero-description">
+                      ClosetIQ helps you organize your wardrobe, review your style preferences, and plan outfits for
+                      everyday wear, work, and events.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => hasActiveSession ? setCurrentTab('wardrobe') : setIsAuthModalOpen(true)}
+                      className="btn-primary"
                     >
-                      <p className="editorial-caps text-muted" style={{ fontSize: '0.62rem' }}>
-                        Client Style Profile
-                      </p>
-                      <p className="font-serif text-2xl font-medium text-obsidian mt-1">
-                        {profile?.fullName || 'Sloane Sterling'}
-                      </p>
-                      <div className="mt-3 flex items-center justify-end gap-1.5 flex-wrap">
-                        <span className="badge-formality badge-terracotta">
-                          {profile?.seasonalPalette?.replace('_', ' ') || 'TRUE WINTER'}
-                        </span>
-                        <span className="badge-formality badge-olive">
-                          {profile?.bodyShapeConfirmed || 'HOURGLASS'}
-                        </span>
-                      </div>
-                      <p className="text-muted mt-2 font-mono" style={{ fontSize: '0.68rem' }}>
-                        Height: {profile?.heightCm} cm • Tier: {profile?.budgetTier}
-                      </p>
-                    </div>
+                      {hasActiveSession ? 'View your wardrobe' : 'Sign in to get started'}
+                    </button>
                   </div>
+                  <aside className="profile-summary" aria-label="Style profile">
+                    <p className="editorial-caps text-muted">Style profile</p>
+                    <p className="profile-name">{profile?.fullName || 'Not set up'}</p>
+                    {profile ? (
+                      <div className="profile-details">
+                        {profile.seasonalPalette && (
+                          <span className="badge-formality badge-terracotta">
+                            {profile.seasonalPalette.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                        {profile.bodyShapeConfirmed && (
+                          <span className="badge-formality badge-olive">{profile.bodyShapeConfirmed}</span>
+                        )}
+                        {profile.heightCm && <span>{profile.heightCm} cm</span>}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted">Your preferences will appear here when a profile is connected.</p>
+                    )}
+                  </aside>
                 </section>
 
-                {/* Metrics 4-Column Grid */}
-                <section className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <section className="dashboard-metrics">
                   <div className="editorial-card p-6">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="editorial-caps text-muted">Wardrobe Capsule</span>
+                      <span className="editorial-caps text-muted">Wardrobe items</span>
                       <Shirt style={{ width: '1.25rem', height: '1.25rem', color: 'var(--accent-terracotta)' }} />
                     </div>
                     <p className="font-serif text-4xl font-light text-obsidian">{wardrobe.length}</p>
-                    <p className="text-xs text-muted mt-1">Owned & cataloged garments</p>
+                    <p className="text-xs text-muted mt-1">Items in your wardrobe</p>
                   </div>
 
                   <div className="editorial-card p-6">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="editorial-caps text-muted">Algorithmic Ensembles</span>
+                      <span className="editorial-caps text-muted">Outfit suggestions</span>
                       <Layers style={{ width: '1.25rem', height: '1.25rem', color: 'var(--accent-olive)' }} />
                     </div>
                     <p className="font-serif text-4xl font-light text-obsidian">{outfits.length}</p>
-                    <p className="text-xs text-muted mt-1">Mathematically scored pairings</p>
+                    <p className="text-xs text-muted mt-1">Suggestions from your wardrobe</p>
                   </div>
 
                   <div className="editorial-card p-6">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="editorial-caps text-muted">Colorimetry ITA°</span>
+                      <span className="editorial-caps text-muted">Style profile</span>
                       <Sparkles style={{ width: '1.25rem', height: '1.25rem', color: 'var(--accent-gold)' }} />
                     </div>
-                    <p className="font-serif text-4xl font-light text-obsidian">
-                      {analysis?.itaAngle ? `${analysis.itaAngle}°` : '51.4°'}
+                    <p className="font-serif text-2xl font-light text-obsidian">
+                      {profile ? 'Available' : 'Not set up'}
                     </p>
-                    <p className="text-xs text-muted mt-1">Individual Typology Angle</p>
+                    <p className="text-xs text-muted mt-1">Your preferences and measurements</p>
                   </div>
 
                   <div className="editorial-card p-6">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="editorial-caps text-muted">Luxury Catalog</span>
+                      <span className="editorial-caps text-muted">Merchant catalog</span>
                       <Compass style={{ width: '1.25rem', height: '1.25rem', color: 'var(--text-obsidian)' }} />
                     </div>
-                    <p className="font-serif text-4xl font-light text-obsidian">{catalog.length}</p>
-                    <p className="text-xs text-muted mt-1">Curated luxury merchant items</p>
+                    <p className="font-serif text-2xl font-light text-obsidian">Not connected</p>
+                    <p className="text-xs text-muted mt-1">Merchant items are not configured</p>
                   </div>
                 </section>
 
-                {/* Featured Ensembles */}
                 <section>
                   <div className="flex items-center justify-between mb-6">
                     <div>
-                      <span className="editorial-caps text-terracotta">Curated Outfits</span>
-                      <h2 className="font-serif text-3xl font-light text-obsidian mt-1">
-                        Algorithmic Formula Recommendations
-                      </h2>
+                      <span className="editorial-caps text-terracotta">Outfit planning</span>
+                      <h2 className="font-serif text-3xl font-light text-obsidian mt-1">Your outfit suggestions</h2>
                     </div>
-                    <button onClick={() => setCurrentTab('builder')} className="btn-secondary">
+                    <button type="button" onClick={() => setCurrentTab('builder')} className="btn-secondary">
                       <span>Open Outfit Builder</span>
                     </button>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {outfits.length === 0 && (
+                      <div className="empty-state">
+                        <h3>No outfit suggestions yet</h3>
+                        <p>Add wardrobe items and connect the outfit service to see suggestions here.</p>
+                      </div>
+                    )}
                     {outfits.map((outfit) => (
                       <div key={outfit.id} className="editorial-card p-6 space-y-6">
                         <div className="flex items-start justify-between">
@@ -264,13 +236,19 @@ export const App: React.FC = () => {
                               className="rounded-xl overflow-hidden bg-linen-warm aspect-garment"
                               style={{ border: '1px solid var(--border-stone)' }}
                             >
-                              <img src={item.imageUrl} alt={item.name} />
+                              {isProvidedImage(item.imageUrl) ? (
+                                <img src={item.imageUrl} alt={item.name} loading="lazy" decoding="async" />
+                              ) : (
+                                <div className="image-placeholder" aria-hidden="true">
+                                  <Shirt />
+                                </div>
+                              )}
                               <div
                                 style={{
                                   position: 'absolute',
                                   inset: 'auto 0 0 0',
                                   padding: '0.4rem',
-                                  background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)',
+                                  background: 'rgba(20, 20, 22, 0.86)',
                                   color: '#FFFFFF',
                                 }}
                               >
@@ -291,10 +269,10 @@ export const App: React.FC = () => {
                           style={{ border: '1px solid var(--border-stone-light)' }}
                         >
                           <p className="font-serif text-lg font-medium text-obsidian mb-1">
-                            {outfit.stylingAdvice?.headline || 'Architectural Poise'}
+                            {outfit.stylingAdvice?.headline || 'Styling notes'}
                           </p>
                           <p className="text-xs text-muted" style={{ lineHeight: '1.6' }}>
-                            {outfit.stylingAdvice?.editorialSummary}
+                            {outfit.stylingAdvice?.editorialSummary || 'No notes were provided for this outfit.'}
                           </p>
                         </div>
                       </div>
@@ -304,7 +282,6 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            {/* 2. WARDROBE TAB */}
             {currentTab === 'wardrobe' && (
               <div className="space-y-8 animate-fade-in">
                 <div
@@ -315,26 +292,26 @@ export const App: React.FC = () => {
                     <span className="editorial-caps text-terracotta">Capsule Collection</span>
                     <h1 className="editorial-title text-4xl font-light text-obsidian mt-1">Wardrobe Archive</h1>
                     <p className="text-sm text-muted mt-1">
-                      {wardrobe.length} cataloged pieces evaluated for proportional silhouette and CIELAB color harmony.
+                      Your saved garments and the details you choose to record.
                     </p>
                   </div>
-                  <button
-                    onClick={() => alert('Add Garment ingestion flow.')}
-                    className="btn-primary"
-                  >
-                    <span>+ Add Garment</span>
-                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {wardrobe.length === 0 && (
+                    <div className="empty-state empty-state-wide">
+                      <h2>Your wardrobe is empty</h2>
+                      <p>[TODO: connect the garment upload flow before launch.]</p>
+                    </div>
+                  )}
                   {wardrobe.map((item) => (
                     <div key={item.id} className="editorial-card flex flex-col">
                       <div className="aspect-garment">
-                        {item.imageUrl ? (
-                          <img src={item.imageUrl} alt={item.name} />
+                        {isProvidedImage(item.imageUrl) ? (
+                          <img src={item.imageUrl} alt={item.name} loading="lazy" decoding="async" />
                         ) : (
-                          <div className="flex items-center justify-center h-full text-muted">
-                            <Shirt style={{ width: '3rem', height: '3rem' }} />
+                          <div className="image-placeholder" aria-hidden="true">
+                            <Shirt />
                           </div>
                         )}
                         <div style={{ position: 'absolute', top: '0.75rem', left: '0.75rem' }}>
@@ -364,7 +341,7 @@ export const App: React.FC = () => {
                       <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
                         <div>
                           <p className="editorial-caps text-muted" style={{ fontSize: '0.65rem' }}>
-                            {item.brand || 'Luxury Atelier'}
+                            {item.brand || 'Brand not provided'}
                           </p>
                           <h3 className="font-serif text-xl font-medium text-obsidian mt-1">{item.name}</h3>
                           <p className="text-xs text-muted mt-1">{item.subCategory}</p>
@@ -401,21 +378,25 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            {/* 3. OUTFIT BUILDER TAB */}
             {currentTab === 'builder' && (
               <div className="space-y-8 animate-fade-in">
                 <div className="pb-6" style={{ borderBottom: '1px solid var(--border-stone)' }}>
-                  <span className="editorial-caps text-terracotta">Mathematical Rule Engine</span>
+                  <span className="editorial-caps text-terracotta">Outfit planning</span>
                   <h1 className="editorial-title text-4xl font-light text-obsidian mt-1">
-                    Algorithmic Outfit Builder
+                    Outfit Builder
                   </h1>
                   <p className="text-sm text-muted mt-1" style={{ maxWidth: '44rem' }}>
-                    Calculates deterministic compatibility across Color Harmony (CIELAB ΔE & angular relationships),
-                    Silhouette Balance (anatomical compensation), and Formality Alignment.
+                    Build outfit combinations from your wardrobe and see the details behind each suggestion.
                   </p>
                 </div>
 
                 <div className="space-y-8">
+                  {outfits.length === 0 && (
+                    <div className="empty-state">
+                      <h2>No outfits to show</h2>
+                      <p>Outfit suggestions will appear when wardrobe items and the recommendation service are available.</p>
+                    </div>
+                  )}
                   {outfits.map((outfit) => (
                     <div key={outfit.id} className="editorial-card p-8 space-y-8">
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -440,7 +421,7 @@ export const App: React.FC = () => {
                             </p>
                           </div>
                           <div
-                            className="rounded-full flex items-center justify-center text-white bg-obsidian"
+                            className="score-sparkle-icon flex items-center justify-center text-white bg-obsidian"
                             style={{ width: '2.75rem', height: '2.75rem' }}
                           >
                             <Sparkles style={{ width: '1.25rem', height: '1.25rem', color: 'var(--accent-gold)' }} />
@@ -464,7 +445,7 @@ export const App: React.FC = () => {
                             />
                           </div>
                           <p className="text-xs text-muted mt-2" style={{ fontSize: '0.72rem' }}>
-                            {outfit.ruleBreakdown?.colorHarmony?.details || 'Complementary tonal balance'}
+                            {outfit.ruleBreakdown?.colorHarmony?.details || 'No color notes provided.'}
                           </p>
                         </div>
 
@@ -482,7 +463,7 @@ export const App: React.FC = () => {
                             />
                           </div>
                           <p className="text-xs text-muted mt-2" style={{ fontSize: '0.72rem' }}>
-                            {outfit.ruleBreakdown?.silhouetteBalance?.critique || 'Proportional vertical drape'}
+                            {outfit.ruleBreakdown?.silhouetteBalance?.critique || 'No silhouette notes provided.'}
                           </p>
                         </div>
 
@@ -500,7 +481,7 @@ export const App: React.FC = () => {
                             />
                           </div>
                           <p className="text-xs text-muted mt-2" style={{ fontSize: '0.72rem' }}>
-                            {outfit.ruleBreakdown?.formalityAlignment?.critique || 'Target formality verified'}
+                            {outfit.ruleBreakdown?.formalityAlignment?.critique || 'No formality notes provided.'}
                           </p>
                         </div>
                       </div>
@@ -514,7 +495,13 @@ export const App: React.FC = () => {
                             style={{ border: '1px solid var(--border-stone)' }}
                           >
                             <div className="aspect-garment">
-                              <img src={item.imageUrl} alt={item.name} />
+                              {isProvidedImage(item.imageUrl) ? (
+                                <img src={item.imageUrl} alt={item.name} loading="lazy" decoding="async" />
+                              ) : (
+                                <div className="image-placeholder" aria-hidden="true">
+                                  <Shirt />
+                                </div>
+                              )}
                             </div>
                             <div className="p-3">
                               <div className="flex justify-between items-center mb-1">
@@ -571,17 +558,22 @@ export const App: React.FC = () => {
             {currentTab === 'analysis' && (
               <div className="space-y-8 animate-fade-in">
                 <div className="pb-6" style={{ borderBottom: '1px solid var(--border-stone)' }}>
-                  <span className="editorial-caps text-terracotta">Computer Vision & Colorimetry</span>
+                  <span className="editorial-caps text-terracotta">Style preferences</span>
                   <h1 className="editorial-title text-4xl font-light text-obsidian mt-1">
-                    Biometric & Spectrometry Lab
+                    Style analysis
                   </h1>
                   <p className="text-sm text-muted mt-1">
-                    Deterministic geometry derived from anatomical landmarks and colorimetric skin spectrometry.
+                    Review the measurements and color preferences saved to your profile.
                   </p>
                 </div>
 
+                {!analysis && (
+                  <div className="empty-state" role="status">
+                    <h2>No completed analysis</h2>
+                    <p>Analysis results will appear here after a completed assessment is connected to your profile.</p>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Geometric Morphometry Card */}
                   <div className="editorial-card p-6 space-y-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -589,7 +581,7 @@ export const App: React.FC = () => {
                         <p className="text-xs text-muted mt-0.5">Anatomical proportions & classification</p>
                       </div>
                       <span className="badge-formality badge-olive">
-                        {analysis?.detectedBodyShape || 'HOURGLASS'}
+                        {analysis?.detectedBodyShape || 'Not available'}
                       </span>
                     </div>
 
@@ -603,7 +595,7 @@ export const App: React.FC = () => {
                           <p className="text-muted" style={{ fontSize: '0.7rem' }}>Horizontal anatomical proportion</p>
                         </div>
                         <p className="font-mono text-xl font-semibold text-obsidian">
-                          {analysis?.shoulderHipRatio || 1.02}
+                          {analysis?.shoulderHipRatio ?? 'Not available'}
                         </p>
                       </div>
 
@@ -616,7 +608,7 @@ export const App: React.FC = () => {
                           <p className="text-muted" style={{ fontSize: '0.7rem' }}>Natural waist definition factor</p>
                         </div>
                         <p className="font-mono text-xl font-semibold text-obsidian">
-                          {analysis?.waistHipRatio || 0.72}
+                          {analysis?.waistHipRatio ?? 'Not available'}
                         </p>
                       </div>
 
@@ -629,13 +621,12 @@ export const App: React.FC = () => {
                           <p className="text-muted" style={{ fontSize: '0.7rem' }}>Vertical balance index</p>
                         </div>
                         <p className="font-mono text-xl font-semibold text-obsidian">
-                          {analysis?.torsoLegRatio || 0.85}
+                          {analysis?.torsoLegRatio ?? 'Not available'}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Spectrometric Colorimetry Card */}
                   <div className="editorial-card p-6 space-y-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -643,7 +634,7 @@ export const App: React.FC = () => {
                         <p className="text-xs text-muted mt-0.5">CIELAB coordinates & ITA° typology</p>
                       </div>
                       <span className="badge-formality badge-terracotta">
-                        {analysis?.detectedPalette || 'TRUE_WINTER'}
+                        {analysis?.detectedPalette || 'Not available'}
                       </span>
                     </div>
 
@@ -654,7 +645,7 @@ export const App: React.FC = () => {
                       >
                         <p className="font-mono text-muted" style={{ fontSize: '0.7rem' }}>L* (Luminance)</p>
                         <p className="font-mono text-xl font-semibold text-obsidian mt-1">
-                          {analysis?.skinLabL || 66.8}
+                          {analysis?.skinLabL ?? 'Not available'}
                         </p>
                       </div>
                       <div
@@ -663,7 +654,7 @@ export const App: React.FC = () => {
                       >
                         <p className="font-mono text-muted" style={{ fontSize: '0.7rem' }}>a* (Red-Green)</p>
                         <p className="font-mono text-xl font-semibold text-obsidian mt-1">
-                          {analysis?.skinLabA || 11.2}
+                          {analysis?.skinLabA ?? 'Not available'}
                         </p>
                       </div>
                       <div
@@ -672,7 +663,7 @@ export const App: React.FC = () => {
                       >
                         <p className="font-mono text-muted" style={{ fontSize: '0.7rem' }}>b* (Yellow-Blue)</p>
                         <p className="font-mono text-xl font-semibold text-obsidian mt-1">
-                          {analysis?.skinLabB || 13.4}
+                          {analysis?.skinLabB ?? 'Not available'}
                         </p>
                       </div>
                     </div>
@@ -684,7 +675,7 @@ export const App: React.FC = () => {
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-medium text-muted">Individual Typology Angle (ITA)</span>
                         <span className="font-mono text-base font-semibold text-obsidian">
-                          {analysis?.itaAngle || 51.4}°
+                          {analysis?.itaAngle != null ? `${analysis.itaAngle}°` : 'Not available'}
                         </span>
                       </div>
                       <div
@@ -693,7 +684,7 @@ export const App: React.FC = () => {
                       >
                         <span className="text-xs font-medium text-muted">Confirmed Undertone</span>
                         <span className="badge-formality badge-olive">
-                          {analysis?.detectedUndertone || 'COOL'}
+                          {analysis?.detectedUndertone || 'Not available'}
                         </span>
                       </div>
                     </div>
@@ -702,7 +693,6 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            {/* 5. DISCOVERY TAB */}
             {currentTab === 'discovery' && (
               <div className="space-y-8 animate-fade-in">
                 <div
@@ -710,88 +700,31 @@ export const App: React.FC = () => {
                   style={{ borderBottom: '1px solid var(--border-stone)' }}
                 >
                   <div>
-                    <span className="editorial-caps text-terracotta">Global Luxury Index</span>
+                    <span className="editorial-caps text-terracotta">Product discovery</span>
                     <h1 className="editorial-title text-4xl font-light text-obsidian mt-1">
-                      Curated Discovery Catalog
+                      Discover pieces
                     </h1>
                     <p className="text-sm text-muted mt-1">
-                      Pieces hand-selected from SSENSE, MR PORTER, and NET-A-PORTER for client palette harmony.
+                      Browse products from a connected merchant catalog.
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  {catalog.map((product) => (
-                    <div key={product.id} className="editorial-card flex flex-col">
-                      <div className="aspect-garment">
-                        {product.imageUrls?.[0] && (
-                          <img src={product.imageUrls[0]} alt={product.title} />
-                        )}
-                        <div style={{ position: 'absolute', top: '0.75rem', left: '0.75rem' }}>
-                          <span className="badge-formality" style={{ backgroundColor: 'rgba(255,255,255,0.9)' }}>
-                            {product.merchantName}
-                          </span>
-                        </div>
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: '0.75rem',
-                            right: '0.75rem',
-                            padding: '0.2rem 0.6rem',
-                            borderRadius: '9999px',
-                            backgroundColor: 'rgba(20,20,22,0.75)',
-                            color: '#FFFFFF',
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: '0.7rem',
-                          }}
-                        >
-                          ${product.price}
-                        </div>
-                      </div>
-
-                      <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
-                        <div>
-                          <p className="editorial-caps text-muted" style={{ fontSize: '0.65rem' }}>
-                            {product.brand}
-                          </p>
-                          <h3 className="font-serif text-xl font-medium text-obsidian mt-1">{product.title}</h3>
-                          <p
-                            className="text-xs text-muted mt-2"
-                            style={{
-                              lineHeight: '1.5',
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                            }}
-                          >
-                            {product.description}
-                          </p>
-                        </div>
-
-                        <div
-                          className="pt-3 flex items-center justify-between"
-                          style={{ borderTop: '1px solid var(--border-stone-light)' }}
-                        >
-                          <span className="editorial-caps text-muted" style={{ fontSize: '0.65rem' }}>
-                            {product.subCategory}
-                          </span>
-                          <span
-                            className="text-xs font-semibold text-terracotta"
-                            style={{ cursor: 'pointer', textDecoration: 'underline' }}
-                          >
-                            View Merchant →
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="empty-state">
+                  <h2>No products to show</h2>
+                  <p>[TODO: connect a verified merchant catalog before launch.]</p>
                 </div>
               </div>
             )}
           </>
         )}
       </main>
+      <SiteFooter />
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={setSession}
+      />
     </div>
   );
 };

@@ -4,6 +4,21 @@ exports.analysisController = exports.AnalysisController = void 0;
 const analysis_service_js_1 = require("../services/analysis.service.js");
 const errors_js_1 = require("../utils/errors.js");
 class AnalysisController {
+    async uploadPhoto(req, res) {
+        if (!req.user)
+            throw new errors_js_1.UnauthorizedError();
+        const { imageData, fileName, category } = req.body;
+        if (!imageData) {
+            res.status(400).json({ success: false, error: { code: 'NO_IMAGE_DATA', message: 'imageData is required' } });
+            return;
+        }
+        const result = await analysis_service_js_1.analysisService.saveUploadedImage(req.user.userId, imageData, fileName, category);
+        res.json({
+            success: true,
+            data: result,
+            meta: { timestamp: new Date().toISOString() },
+        });
+    }
     async getUploadTicket(req, res) {
         if (!req.user)
             throw new errors_js_1.UnauthorizedError();

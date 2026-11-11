@@ -285,7 +285,7 @@ model Outfit {
   formalityScore       Float         // 0 - 100
   ruleBreakdown        Json          // Explainability payload for audit and UI
   
-  // AI-generated natural language styling advice (swappable provider)
+  // Natural-language styling advice returned by the configured provider
   stylingAdvice        String?       @db.Text
   
   isCurated            Boolean       @default(false)

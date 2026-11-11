@@ -43,9 +43,9 @@ class WardrobeService {
             userId: item.userId,
             name: item.name,
             imageKey: item.imageKey,
-            imageUrl: item.imageKey.startsWith('http')
+            imageUrl: item.imageKey.startsWith('/uploads/') || item.imageKey.startsWith('uploads/')
                 ? item.imageKey
-                : 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=800&q=80',
+                : '',
             category: item.category,
             subCategory: item.subCategory,
             primaryColorHex: item.primaryColorHex,
@@ -94,9 +94,9 @@ class WardrobeService {
             userId: item.userId,
             name: item.name,
             imageKey: item.imageKey,
-            imageUrl: item.imageKey.startsWith('http')
+            imageUrl: item.imageKey.startsWith('/uploads/') || item.imageKey.startsWith('uploads/')
                 ? item.imageKey
-                : 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=800&q=80',
+                : '',
             category: item.category,
             subCategory: item.subCategory,
             primaryColorHex: item.primaryColorHex,
@@ -128,9 +128,9 @@ class WardrobeService {
             userId: item.userId,
             name: item.name,
             imageKey: item.imageKey,
-            imageUrl: item.imageKey.startsWith('http')
+            imageUrl: item.imageKey.startsWith('/uploads/') || item.imageKey.startsWith('uploads/')
                 ? item.imageKey
-                : 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=800&q=80',
+                : '',
             category: item.category,
             subCategory: item.subCategory,
             primaryColorHex: item.primaryColorHex,
