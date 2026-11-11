@@ -151,12 +151,6 @@ export class AuthService {
       throw new UnauthorizedError('Invalid or reused refresh token. Session terminated.');
     }
 
-    // Revoke old token
-    await prisma.refreshToken.update({
-      where: { id: existingToken.id },
-      data: { revokedAt: new Date() },
-    });
-
     // Issue new token pair
     const accessToken = signAccessToken({
       userId: existingToken.user.id,
@@ -170,13 +164,19 @@ export class AuthService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    await prisma.refreshToken.create({
-      data: {
-        userId: existingToken.user.id,
-        tokenHash: newTokenHash,
-        expiresAt,
-      },
-    });
+    await prisma.$transaction([
+      prisma.refreshToken.update({
+        where: { id: existingToken.id },
+        data: { revokedAt: new Date() },
+      }),
+      prisma.refreshToken.create({
+        data: {
+          userId: existingToken.user.id,
+          tokenHash: newTokenHash,
+          expiresAt,
+        },
+      }),
+    ]);
 
     return {
       accessToken,

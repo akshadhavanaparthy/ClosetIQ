@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { RequestHandler } from 'express';
 import { AppError } from '../utils/errors.js';
 
 interface RateLimitRecord {
@@ -9,8 +9,8 @@ interface RateLimitRecord {
 const rateLimitStore = new Map<string, RateLimitRecord>();
 
 // Simple in-memory rate limiter for development and local testing
-export function createRateLimiter(windowMs = 60 * 1000, maxRequests = 100) {
-  return (req: Request, _res: Response, next: NextFunction): void => {
+export function createRateLimiter(windowMs = 60 * 1000, maxRequests = 100): RequestHandler {
+  return (req, _res, next) => {
     const ip = req.ip || req.socket.remoteAddress || 'unknown-ip';
     const now = Date.now();
 

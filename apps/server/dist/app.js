@@ -8,8 +8,6 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
-const path_1 = __importDefault(require("path"));
-const fs_1 = __importDefault(require("fs"));
 const index_js_1 = require("./config/index.js");
 const index_js_2 = __importDefault(require("./routes/index.js"));
 const errorHandler_js_1 = require("./middleware/errorHandler.js");
@@ -42,12 +40,6 @@ function createApp() {
             version: '1.0.0',
         });
     });
-    // Static user-uploaded assets
-    const uploadsDir = path_1.default.join(process.cwd(), 'uploads');
-    if (!fs_1.default.existsSync(uploadsDir)) {
-        fs_1.default.mkdirSync(uploadsDir, { recursive: true });
-    }
-    app.use('/uploads', express_1.default.static(uploadsDir));
     // 5. Mount API Routes
     app.use('/api/v1', index_js_2.default);
     // 6. Centralized Error Handler

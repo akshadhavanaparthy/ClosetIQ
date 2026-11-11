@@ -1,23 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MockStorageProvider = void 0;
-const crypto_1 = require("crypto");
+const errors_js_1 = require("../../../utils/errors.js");
 class MockStorageProvider {
-    async generateUploadTicket(req) {
-        const ext = req.fileName.split('.').pop() || 'webp';
-        const storageKey = `${req.category.toLowerCase()}/${req.userId}/${(0, crypto_1.randomUUID)()}.${ext}`;
-        return {
-            uploadUrl: `https://mock-storage.closetiq.fashion/upload?key=${storageKey}&token=${(0, crypto_1.randomUUID)()}`,
-            storageKey,
-            publicUrl: '',
-            expiresInSeconds: 900,
-        };
+    async generateUploadTicket(_req) {
+        throw new errors_js_1.ServiceUnavailableError('Image storage is not configured.');
     }
-    async getSignedDownloadUrl(storageKey) {
-        return `https://mock-storage.closetiq.fashion/${storageKey}?signature=${(0, crypto_1.randomUUID)()}`;
+    async getSignedDownloadUrl(_storageKey) {
+        throw new errors_js_1.ServiceUnavailableError('Image storage is not configured.');
     }
     async deleteObject(_storageKey) {
-        // No-op for mock
+        throw new errors_js_1.ServiceUnavailableError('Image storage is not configured.');
     }
 }
 exports.MockStorageProvider = MockStorageProvider;

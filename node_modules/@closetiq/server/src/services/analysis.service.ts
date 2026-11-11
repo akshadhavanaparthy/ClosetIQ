@@ -1,34 +1,12 @@
-import path from 'path';
-import fs from 'fs';
 import { prisma, AnalysisStatus } from '@closetiq/database';
 import { StorageFactory } from './storage/storage.factory.js';
 import { mlClient } from './mlClient.service.js';
 import { ConfirmAnalysisDto, BodyAnalysisResponseDto } from '@closetiq/shared-types';
-import { NotFoundError } from '../utils/errors.js';
+import { NotFoundError, ServiceUnavailableError } from '../utils/errors.js';
 
 export class AnalysisService {
-  async saveUploadedImage(userId: string, imageData: string, fileName = 'photo.jpg', category = 'PORTRAIT') {
-    const ext = fileName.split('.').pop() || 'jpg';
-    const uniqueName = `${category.toLowerCase()}_${Date.now()}.${ext}`;
-    const userDir = path.join(process.cwd(), 'uploads', `user_${userId}`);
-    if (!fs.existsSync(userDir)) {
-      fs.mkdirSync(userDir, { recursive: true });
-    }
-    const filePath = path.join(userDir, uniqueName);
-
-    let base64Data = imageData;
-    if (imageData.includes(';base64,')) {
-      base64Data = imageData.split(';base64,')[1];
-    }
-    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
-
-    const publicUrl = `/uploads/user_${userId}/${uniqueName}`;
-    const storageKey = `uploads/user_${userId}/${uniqueName}`;
-
-    return {
-      storageKey,
-      imageUrl: publicUrl,
-    };
+  async saveUploadedImage(_userId: string, _imageData: string, _fileName = 'photo.jpg', _category = 'PORTRAIT') {
+    throw new ServiceUnavailableError('Image storage is not configured.');
   }
 
   async getUploadTicket(userId: string, category: 'BODY_ANALYSIS' | 'PORTRAIT', fileName = 'upload.jpg') {

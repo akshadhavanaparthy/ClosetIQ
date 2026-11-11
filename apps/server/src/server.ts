@@ -4,6 +4,7 @@ import { logger } from './utils/logger.js';
 import { prisma } from '@closetiq/database';
 
 async function bootstrap() {
+  await prisma.$connect();
   const app = createApp();
 
   const server = app.listen(config.port, '0.0.0.0', () => {

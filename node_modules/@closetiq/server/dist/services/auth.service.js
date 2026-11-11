@@ -128,11 +128,6 @@ class AuthService {
             });
             throw new errors_js_1.UnauthorizedError('Invalid or reused refresh token. Session terminated.');
         }
-        // Revoke old token
-        await database_1.prisma.refreshToken.update({
-            where: { id: existingToken.id },
-            data: { revokedAt: new Date() },
-        });
         // Issue new token pair
         const accessToken = (0, jwt_js_1.signAccessToken)({
             userId: existingToken.user.id,
@@ -143,13 +138,19 @@ class AuthService {
         const newTokenHash = hashToken(newRawRefreshToken);
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 7);
-        await database_1.prisma.refreshToken.create({
-            data: {
-                userId: existingToken.user.id,
-                tokenHash: newTokenHash,
-                expiresAt,
-            },
-        });
+        await database_1.prisma.$transaction([
+            database_1.prisma.refreshToken.update({
+                where: { id: existingToken.id },
+                data: { revokedAt: new Date() },
+            }),
+            database_1.prisma.refreshToken.create({
+                data: {
+                    userId: existingToken.user.id,
+                    tokenHash: newTokenHash,
+                    expiresAt,
+                },
+            }),
+        ]);
         return {
             accessToken,
             newRawRefreshToken,

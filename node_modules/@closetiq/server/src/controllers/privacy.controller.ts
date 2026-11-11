@@ -10,7 +10,7 @@ export class PrivacyController {
 
     const [user, profile, wardrobeItems, analyses, outfits, wishlist] = await Promise.all([
       prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, createdAt: true } }),
-      prisma.profile.findUnique({ where: { id: userId } }),
+      prisma.profile.findUnique({ where: { userId } }),
       prisma.wardrobeItem.findMany({ where: { userId } }),
       prisma.bodyAnalysis.findMany({ where: { userId } }),
       prisma.outfit.findMany({ where: { userId }, include: { items: true } }),
@@ -43,31 +43,20 @@ export class PrivacyController {
     if (!req.user) throw new UnauthorizedError();
     const userId = req.user.userId;
 
-    // Soft delete user and anonymize
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        deletedAt: new Date(),
-        email: `deleted_${userId}_${Date.now()}@anonymized.closetiq.fashion`,
-      },
-    });
+    await prisma.$transaction(async (transaction) => {
+      await transaction.auditLog.create({
+        data: {
+          userId,
+          action: 'GDPR_ACCOUNT_DELETED',
+        },
+      });
 
-    // Revoke all refresh tokens
-    await prisma.refreshToken.updateMany({
-      where: { userId },
-      data: { revokedAt: new Date() },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action: 'GDPR_ACCOUNT_DELETED',
-      },
+      await transaction.user.delete({ where: { id: userId } });
     });
 
     res.json({
       success: true,
-      data: { message: 'Account and associated personal data successfully queued for permanent purge.' },
+      data: { message: 'Account and associated personal data were permanently deleted.' },
       meta: { timestamp: new Date().toISOString() },
     });
   }

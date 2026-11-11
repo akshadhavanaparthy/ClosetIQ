@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { JwtAccessPayload, Role } from '@closetiq/shared-types';
 import { UnauthorizedError } from './errors.js';
 import { config } from '../config/index.js';
@@ -8,7 +9,7 @@ export function signAccessToken(payload: { userId: string; email: string; role: 
 }
 
 export function signRefreshToken(userId: string): string {
-  return jwt.sign({ userId }, config.jwtRefreshSecret, { expiresIn: '7d' });
+  return jwt.sign({ userId, jti: randomUUID() }, config.jwtRefreshSecret, { expiresIn: '7d' });
 }
 
 export function verifyAccessToken(token: string): JwtAccessPayload {

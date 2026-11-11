@@ -2,8 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import path from 'path';
-import fs from 'fs';
 import { config } from './config/index.js';
 import apiRouter from './routes/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -45,13 +43,6 @@ export function createApp(): express.Application {
       version: '1.0.0',
     });
   });
-
-  // Static user-uploaded assets
-  const uploadsDir = path.join(process.cwd(), 'uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-  app.use('/uploads', express.static(uploadsDir));
 
   // 5. Mount API Routes
   app.use('/api/v1', apiRouter);

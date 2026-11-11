@@ -1,35 +1,13 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.analysisService = exports.AnalysisService = void 0;
-const path_1 = __importDefault(require("path"));
-const fs_1 = __importDefault(require("fs"));
 const database_1 = require("@closetiq/database");
 const storage_factory_js_1 = require("./storage/storage.factory.js");
 const mlClient_service_js_1 = require("./mlClient.service.js");
 const errors_js_1 = require("../utils/errors.js");
 class AnalysisService {
-    async saveUploadedImage(userId, imageData, fileName = 'photo.jpg', category = 'PORTRAIT') {
-        const ext = fileName.split('.').pop() || 'jpg';
-        const uniqueName = `${category.toLowerCase()}_${Date.now()}.${ext}`;
-        const userDir = path_1.default.join(process.cwd(), 'uploads', `user_${userId}`);
-        if (!fs_1.default.existsSync(userDir)) {
-            fs_1.default.mkdirSync(userDir, { recursive: true });
-        }
-        const filePath = path_1.default.join(userDir, uniqueName);
-        let base64Data = imageData;
-        if (imageData.includes(';base64,')) {
-            base64Data = imageData.split(';base64,')[1];
-        }
-        fs_1.default.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
-        const publicUrl = `/uploads/user_${userId}/${uniqueName}`;
-        const storageKey = `uploads/user_${userId}/${uniqueName}`;
-        return {
-            storageKey,
-            imageUrl: publicUrl,
-        };
+    async saveUploadedImage(_userId, _imageData, _fileName = 'photo.jpg', _category = 'PORTRAIT') {
+        throw new errors_js_1.ServiceUnavailableError('Image storage is not configured.');
     }
     async getUploadTicket(userId, category, fileName = 'upload.jpg') {
         const storage = storage_factory_js_1.StorageFactory.getProvider();

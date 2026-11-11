@@ -175,6 +175,14 @@ const fetch = (input: RequestInfo | URL, init: RequestInit = {}): Promise<Respon
   return authenticatedFetch(input, init);
 };
 
+async function throwApiError(response: Response, action: string): Promise<never> {
+  if (response.headers.get('content-type')?.includes('application/json')) {
+    const json = await response.json();
+    throw new Error(json.error?.message || `${action} (${response.status}).`);
+  }
+  throw new Error(`${action} (${response.status}).`);
+}
+
 // --- COMPLETE API CLIENT ---
 export const api = {
   // Session & Authentication
@@ -196,7 +204,7 @@ export const api = {
       credentials: 'include',
     });
     if (!res.ok) {
-      throw new Error(`Sign-in failed (${res.status}).`);
+      await throwApiError(res, 'Sign-in failed');
     }
     const json = await res.json();
     const user: UserSession = {
@@ -219,7 +227,7 @@ export const api = {
       credentials: 'include',
     });
     if (!res.ok) {
-      throw new Error(`Account creation failed (${res.status}).`);
+      await throwApiError(res, 'Account creation failed');
     }
     const json = await res.json();
     const user: UserSession = {
@@ -302,16 +310,22 @@ export const api = {
   },
 
   async updateWardrobeItem(id: string, updates: Partial<WardrobeItemDto>): Promise<WardrobeItemDto> {
-    const idx = wardrobeState.findIndex((w) => w.id === id);
-    if (idx !== -1) {
-      wardrobeState[idx] = { ...wardrobeState[idx], ...updates, updatedAt: new Date().toISOString() };
-      setStored('wardrobe', wardrobeState);
-      return wardrobeState[idx];
-    }
-    throw new Error('Wardrobe item not found');
+    const res = await fetch(`${API_BASE}/wardrobe/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) await throwApiError(res, 'Wardrobe item could not be updated');
+    const json = await res.json();
+    const index = wardrobeState.findIndex((item) => item.id === id);
+    if (index >= 0) wardrobeState[index] = json.data;
+    setStored('wardrobe', wardrobeState);
+    return json.data;
   },
 
   async deleteWardrobeItem(id: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/wardrobe/${encodeURIComponent(id)}`, { method: 'DELETE', headers: getAuthHeaders() });
+    if (!res.ok) await throwApiError(res, 'Wardrobe item could not be deleted');
     wardrobeState = wardrobeState.filter((w) => w.id !== id);
     setStored('wardrobe', wardrobeState);
     this.logAudit('WARDROBE_ITEM_DELETED', `Deleted garment ${id}`, sessionState?.email || 'user');
@@ -438,7 +452,11 @@ export const api = {
   },
 
   async getProductById(id: string): Promise<ProductDto | null> {
-    return catalogState.find((p) => p.id === id) || null;
+    const res = await fetch(`${API_BASE}/discovery/${encodeURIComponent(id)}`);
+    if (res.status === 404) return null;
+    if (!res.ok) await throwApiError(res, 'Product details could not be loaded');
+    const json = await res.json();
+    return json.data;
   },
 
   // Complete My Outfit Engine with dynamic item swapping
@@ -532,35 +550,11 @@ export const api = {
     setStored('cart', cartState);
   },
 
-  async placeOrder(orderData: {
+  async placeOrder(_orderData: {
     shippingAddress: OrderRecord['shippingAddress'];
     paymentMethod: string;
-  }): Promise<OrderRecord> {
-    if (cartState.length === 0) throw new Error('Cart is empty');
-
-    const subtotal = cartState.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-    const tax = Math.round(subtotal * 0.08 * 100) / 100;
-    const shipping = 0; // Complimentary white-glove shipping
-    const total = subtotal + tax + shipping;
-
-    const order: OrderRecord = {
-      id: `ORD-${Math.floor(10000 + Math.random() * 90000)}`,
-      date: new Date().toISOString(),
-      items: [...cartState],
-      subtotal,
-      tax,
-      shipping,
-      total,
-      status: 'CONFIRMED',
-      shippingAddress: orderData.shippingAddress,
-      paymentMethod: orderData.paymentMethod,
-    };
-
-    ordersState.unshift(order);
-    setStored('orders', ordersState);
-    this.clearCart();
-    this.logAudit('ORDER_PLACED', `Order ${order.id} placed for $${total}`, sessionState?.email || 'user');
-    return order;
+  }): Promise<never> {
+    throw new Error('ClosetIQ checkout is unavailable. Complete purchases on the merchant website.');
   },
 
   getOrders(): OrderRecord[] {
@@ -569,15 +563,12 @@ export const api = {
 
   // Recommendation Feedback
   async recordRecommendationFeedback(outfitId: string, isLiked: boolean, tags: string[] = [], comment?: string): Promise<void> {
-    try {
-      await fetch(`${API_BASE}/recommendations/feedback`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ outfitId, rating: isLiked ? 5 : 1, feedbackTags: tags, feedbackText: comment }),
-      });
-    } catch {
-      // Fallback
-    }
+    const res = await fetch(`${API_BASE}/recommendations/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ outfitId, rating: isLiked ? 5 : 1, feedbackTags: tags, feedbackText: comment }),
+    });
+    if (!res.ok) await throwApiError(res, 'Recommendation feedback could not be saved');
     this.logAudit(
       'RECOMMENDATION_FEEDBACK',
       `Outfit ${outfitId}: ${isLiked ? 'Liked' : 'Disliked'} (${tags.join(', ')})`,
@@ -634,30 +625,35 @@ export const api = {
   },
 
   // Privacy & Data Rights
-  exportUserData(): string {
-    const exportData = {
-      user: sessionState,
-      profile: profileState,
-      wardrobe: wardrobeState,
-      orders: ordersState,
-      wishlist: wishlistState,
-      savedOutfits: savedOutfitsState,
-      exportedAt: new Date().toISOString(),
-    };
+  async exportUserData(): Promise<string> {
+    const res = await fetch(`${API_BASE}/privacy/export-data`, { headers: getAuthHeaders() });
+    if (!res.ok) await throwApiError(res, 'Account data could not be exported');
+    const json = await res.json();
     this.logAudit('DATA_EXPORT', 'Full client personal data archive generated', sessionState?.email || 'user');
-    return JSON.stringify(exportData, null, 2);
+    return JSON.stringify(json.data, null, 2);
   },
 
   async deleteAccount(): Promise<void> {
-    this.logAudit('ACCOUNT_PURGED', 'User invoked Right to be Forgotten (Full Deletion)', sessionState?.email || 'user');
-    localStorage.clear();
-    sessionState = null;
+    const res = await fetch(`${API_BASE}/privacy/delete-account`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) await throwApiError(res, 'Account deletion could not be completed');
+    clearSession();
     profileState = null;
     wardrobeState = [];
-    cartState = [];
+    catalogState = [];
     wishlistState = [];
     savedOutfitsState = [];
+    cartState = [];
     ordersState = [];
+    for (const key of ['profile', 'wardrobe', 'saved_outfits', 'cart', 'orders', 'catalog']) {
+      try {
+        localStorage.removeItem(`closetiq_${key}`);
+      } catch (error) {
+        console.warn(`Could not clear stored ${key} data after account deletion:`, error);
+      }
+    }
   },
 
   // Analysis Lab
